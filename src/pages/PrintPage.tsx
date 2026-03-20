@@ -274,13 +274,20 @@ const PrintPage = () => {
               >
                 {pageCards.map((r) => (
                   <div key={r.id} style={{ width: "70mm", height: "74.25mm", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <IdCard
-                      id={r.id}
-                      name={r.name}
-                      teamName={r.teamName}
-                      collegeName={r.collegeName}
-                      track={r.track}
-                      photo={r.photo}
+                    <TemplatePreviewCard
+                      elements={templateConfig?.elements || DEFAULT_ELEMENTS}
+                      backgroundColor={templateConfig?.backgroundColor || "#e8ecf1"}
+                      backgroundImage={templateConfig?.background}
+                      cardWidth={templateConfig?.cardWidth || CARD_WIDTH}
+                      cardHeight={templateConfig?.cardHeight || CARD_HEIGHT}
+                      data={{
+                        id: r.id,
+                        name: r.name,
+                        teamName: r.teamName,
+                        collegeName: r.collegeName,
+                        track: r.track,
+                        photo: r.photo,
+                      }}
                     />
                   </div>
                 ))}
