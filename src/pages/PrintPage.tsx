@@ -39,6 +39,7 @@ const PrintPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Registration>>({});
   const [generating, setGenerating] = useState(false);
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
