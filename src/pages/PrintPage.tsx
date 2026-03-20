@@ -169,6 +169,9 @@ const PrintPage = () => {
           </span>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate("/template-editor")}>
+            <Palette className="w-4 h-4 mr-1" /> Edit Template
+          </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-1" /> Print
           </Button>
