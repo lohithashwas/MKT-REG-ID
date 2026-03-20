@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Download, Search, Users, Shield, ArrowLeft, Printer } from "lucide-react";
+import { Download, Search, Users, Shield, ArrowLeft, Printer, Palette } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 
@@ -119,6 +119,9 @@ const AdminPage = () => {
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => navigate("/")}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Registration
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/template-editor")}>
+              <Palette className="w-4 h-4 mr-1" /> Card Designer
             </Button>
             <Button variant="outline" onClick={() => navigate("/print")}>
               <Printer className="w-4 h-4 mr-1" /> Print ID Cards

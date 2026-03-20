@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { ref, onValue, update } from "firebase/database";
+import { ref, onValue, update, get } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Printer, Download, Edit2, Check, X, Shield } from "lucide-react";
+import { ArrowLeft, Printer, Download, Edit2, Check, X, Shield, Palette } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import IdCard from "@/components/IdCard";
+import TemplatePreviewCard from "@/components/template-editor/TemplatePreviewCard";
+import { TemplateConfig, DEFAULT_ELEMENTS, CARD_WIDTH, CARD_HEIGHT } from "@/types/template";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 
@@ -38,11 +39,17 @@ const PrintPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Registration>>({});
   const [generating, setGenerating] = useState(false);
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!authenticated) return;
+    // Load template
+    get(ref(database, "templateConfig")).then((snap) => {
+      if (snap.exists()) setTemplateConfig(snap.val() as TemplateConfig);
+    });
+    // Load registrations
     const regRef = ref(database, "registrations");
     const unsub = onValue(regRef, (snapshot) => {
       const data = snapshot.val();
@@ -162,6 +169,9 @@ const PrintPage = () => {
           </span>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate("/template-editor")}>
+            <Palette className="w-4 h-4 mr-1" /> Edit Template
+          </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-1" /> Print
           </Button>
@@ -264,13 +274,20 @@ const PrintPage = () => {
               >
                 {pageCards.map((r) => (
                   <div key={r.id} style={{ width: "70mm", height: "74.25mm", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <IdCard
-                      id={r.id}
-                      name={r.name}
-                      teamName={r.teamName}
-                      collegeName={r.collegeName}
-                      track={r.track}
-                      photo={r.photo}
+                    <TemplatePreviewCard
+                      elements={templateConfig?.elements || DEFAULT_ELEMENTS}
+                      backgroundColor={templateConfig?.backgroundColor || "#e8ecf1"}
+                      backgroundImage={templateConfig?.background}
+                      cardWidth={templateConfig?.cardWidth || CARD_WIDTH}
+                      cardHeight={templateConfig?.cardHeight || CARD_HEIGHT}
+                      data={{
+                        id: r.id,
+                        name: r.name,
+                        teamName: r.teamName,
+                        collegeName: r.collegeName,
+                        track: r.track,
+                        photo: r.photo,
+                      }}
                     />
                   </div>
                 ))}
