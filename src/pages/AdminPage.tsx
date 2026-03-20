@@ -120,6 +120,9 @@ const AdminPage = () => {
             <Button variant="outline" onClick={() => navigate("/")}>
               <ArrowLeft className="w-4 h-4 mr-1" /> Registration
             </Button>
+            <Button variant="outline" onClick={() => navigate("/template-editor")}>
+              <Palette className="w-4 h-4 mr-1" /> Card Designer
+            </Button>
             <Button variant="outline" onClick={() => navigate("/print")}>
               <Printer className="w-4 h-4 mr-1" /> Print ID Cards
             </Button>
