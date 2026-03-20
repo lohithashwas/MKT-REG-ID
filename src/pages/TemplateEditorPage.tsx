@@ -125,10 +125,16 @@ const TemplateEditorPage = () => {
   const saveTemplate = async () => {
     setSaving(true);
     try {
+      // Don't store large base64 background images in Firebase (size limit)
+      let bgToSave = backgroundImage;
+      if (bgToSave && bgToSave.length > 500000) {
+        // Compress by drawing to a smaller canvas
+        bgToSave = await compressImage(bgToSave, 400, 600);
+      }
       const config: TemplateConfig = {
         id: "main",
         name: templateName,
-        background: backgroundImage,
+        background: bgToSave || "",
         backgroundColor,
         cardWidth: CARD_WIDTH,
         cardHeight: CARD_HEIGHT,
@@ -138,11 +144,29 @@ const TemplateEditorPage = () => {
       };
       await set(ref(database, "templateConfig"), config);
       toast.success("Template saved! It will be used for ID card generation.");
-    } catch {
-      toast.error("Failed to save template");
+    } catch (err) {
+      console.error("Save template error:", err);
+      toast.error("Failed to save template: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
       setSaving(false);
     }
+  };
+
+  const compressImage = (dataUrl: string, maxW: number, maxH: number): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        if (h > maxH) { w = w * maxH / h; h = maxH; }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      img.src = dataUrl;
+    });
   };
 
   if (!authenticated) {
