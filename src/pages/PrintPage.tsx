@@ -45,6 +45,11 @@ const PrintPage = () => {
 
   useEffect(() => {
     if (!authenticated) return;
+    // Load template
+    get(ref(database, "templateConfig")).then((snap) => {
+      if (snap.exists()) setTemplateConfig(snap.val() as TemplateConfig);
+    });
+    // Load registrations
     const regRef = ref(database, "registrations");
     const unsub = onValue(regRef, (snapshot) => {
       const data = snapshot.val();
