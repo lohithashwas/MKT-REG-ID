@@ -107,20 +107,32 @@ const TemplateEditorPage = () => {
   };
 
   const addCustomImage = () => {
-    const newEl: TemplateElement = {
-      id: `img-${Date.now()}`,
-      type: "customImage",
-      label: "Custom Image",
-      x: 60,
-      y: 100,
-      width: 80,
-      height: 60,
-      borderRadius: 4,
-      visible: true,
-      objectFit: "cover",
+    addImgInputRef.current?.click();
+  };
+
+  const handleAddImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const newEl: TemplateElement = {
+        id: `img-${Date.now()}`,
+        type: "customImage",
+        label: "Custom Image",
+        x: 60,
+        y: 100,
+        width: 80,
+        height: 60,
+        borderRadius: 4,
+        visible: true,
+        objectFit: "cover",
+        imageSrc: reader.result as string,
+      };
+      setElements((prev) => [...prev, newEl]);
+      setSelectedId(newEl.id);
     };
-    setElements((prev) => [...prev, newEl]);
-    setSelectedId(newEl.id);
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const applyLayout = (layoutIdx: number) => {
