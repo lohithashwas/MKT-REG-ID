@@ -14,8 +14,19 @@ interface ElementPropertiesProps {
 }
 
 const ElementProperties = ({ element, onUpdate, onDelete }: ElementPropertiesProps) => {
-  const isTextElement = !["photo", "barcode"].includes(element.type);
+  const isTextElement = !["photo", "barcode", "customImage"].includes(element.type);
+  const isImageElement = element.type === "customImage";
+  const [cropOpen, setCropOpen] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onUpdate({ imageSrc: reader.result as string });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
