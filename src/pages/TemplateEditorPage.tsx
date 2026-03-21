@@ -105,6 +105,23 @@ const TemplateEditorPage = () => {
     setSelectedId(newEl.id);
   };
 
+  const addCustomImage = () => {
+    const newEl: TemplateElement = {
+      id: `img-${Date.now()}`,
+      type: "customImage",
+      label: "Custom Image",
+      x: 60,
+      y: 100,
+      width: 80,
+      height: 60,
+      borderRadius: 4,
+      visible: true,
+      objectFit: "cover",
+    };
+    setElements((prev) => [...prev, newEl]);
+    setSelectedId(newEl.id);
+  };
+
   const applyLayout = (layoutIdx: number) => {
     const layout = PREDEFINED_LAYOUTS[layoutIdx];
     setElements(layout.elements.map((el) => ({ ...el })));
