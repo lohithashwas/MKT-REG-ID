@@ -7,7 +7,8 @@ export type ElementType =
   | "barcode"
   | "eventTitle"
   | "idText"
-  | "customText";
+  | "customText"
+  | "customImage";
 
 export interface TemplateElement {
   id: string;
