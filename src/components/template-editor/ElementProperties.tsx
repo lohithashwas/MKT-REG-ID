@@ -179,6 +179,50 @@ const ElementProperties = ({ element, onUpdate, onDelete }: ElementPropertiesPro
           )}
         </>
       )}
+      {isImageElement && (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Image</Label>
+            <input
+              type="file"
+              ref={imgInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs"
+              onClick={() => imgInputRef.current?.click()}
+            >
+              <Upload className="w-3 h-3 mr-1" /> Upload Image
+            </Button>
+            {element.imageSrc && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={() => setCropOpen(true)}
+              >
+                <Crop className="w-3 h-3 mr-1" /> Crop Image
+              </Button>
+            )}
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Fit</Label>
+            <select
+              value={element.objectFit || "cover"}
+              onChange={(e) => onUpdate({ objectFit: e.target.value as "cover" | "contain" | "fill" })}
+              className="w-full h-7 text-xs border border-input rounded-md px-2 bg-background"
+            >
+              <option value="cover">Cover</option>
+              <option value="contain">Contain</option>
+              <option value="fill">Fill</option>
+            </select>
+          </div>
+        </>
+      )}
 
       <div>
         <Label className="text-xs text-muted-foreground">Border Radius</Label>
@@ -190,10 +234,20 @@ const ElementProperties = ({ element, onUpdate, onDelete }: ElementPropertiesPro
         />
       </div>
 
-      {element.type === "customText" && onDelete && (
+      {(element.type === "customText" || element.type === "customImage") && onDelete && (
         <Button variant="destructive" size="sm" className="w-full h-7 text-xs" onClick={onDelete}>
           <Trash2 className="w-3 h-3 mr-1" /> Remove Element
         </Button>
+      )}
+
+      {isImageElement && element.imageSrc && (
+        <ImageCropDialog
+          open={cropOpen}
+          imageSrc={element.imageSrc}
+          aspectRatio={element.width / element.height}
+          onClose={() => setCropOpen(false)}
+          onCropComplete={(cropped) => onUpdate({ imageSrc: cropped })}
+        />
       )}
     </div>
   );
