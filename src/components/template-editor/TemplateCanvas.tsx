@@ -105,6 +105,36 @@ const TemplateCanvas = ({
         return <svg ref={barcodeRef} style={{ width: "100%", height: "100%" }} />;
       case "customText":
         return <div style={textStyle}>{el.textContent || "Custom Text"}</div>;
+      case "customImage":
+        return el.imageSrc ? (
+          <img
+            src={el.imageSrc}
+            alt={el.label}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: el.objectFit || "cover",
+              borderRadius: el.borderRadius ? `${el.borderRadius}px` : undefined,
+            }}
+            draggable={false}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#e2e8f0",
+              borderRadius: el.borderRadius ? `${el.borderRadius}px` : undefined,
+              fontSize: "9px",
+              color: "#64748b",
+            }}
+          >
+            No Image
+          </div>
+        );
       default:
         return null;
     }
