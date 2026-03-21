@@ -308,14 +308,24 @@ const TemplateEditorPage = () => {
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               Add Elements
             </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start h-8 text-xs"
-              onClick={addCustomText}
-            >
-              <Plus className="w-3 h-3 mr-1.5" /> Custom Text
-            </Button>
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={addCustomText}
+              >
+                <Plus className="w-3 h-3 mr-1.5" /> Custom Text
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={addCustomImage}
+              >
+                <Image className="w-3 h-3 mr-1.5" /> Custom Image
+              </Button>
+            </div>
           </div>
 
           <div>
