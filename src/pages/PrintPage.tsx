@@ -272,25 +272,34 @@ const PrintPage = () => {
                   overflow: "hidden",
                 }}
               >
-                {pageCards.map((r) => (
-                  <div key={r.id} style={{ width: "70mm", height: "74.25mm", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <TemplatePreviewCard
-                      elements={templateConfig?.elements || DEFAULT_ELEMENTS}
-                      backgroundColor={templateConfig?.backgroundColor || "#e8ecf1"}
-                      backgroundImage={templateConfig?.background}
-                      cardWidth={templateConfig?.cardWidth || CARD_WIDTH}
-                      cardHeight={templateConfig?.cardHeight || CARD_HEIGHT}
-                      data={{
-                        id: r.id,
-                        name: r.name,
-                        teamName: r.teamName,
-                        collegeName: r.collegeName,
-                        track: r.track,
-                        photo: r.photo,
-                      }}
-                    />
-                  </div>
-                ))}
+                {pageCards.map((r) => {
+                  const cw = templateConfig?.cardWidth || CARD_WIDTH;
+                  const ch = templateConfig?.cardHeight || CARD_HEIGHT;
+                  const cellWPx = 70 * 3.7795; // 70mm in px
+                  const cellHPx = 74.25 * 3.7795;
+                  const s = Math.min(cellWPx / cw, cellHPx / ch);
+                  return (
+                    <div key={r.id} style={{ width: "70mm", height: "74.25mm", overflow: "hidden" }}>
+                      <div style={{ transform: `scale(${s})`, transformOrigin: "top left" }}>
+                        <TemplatePreviewCard
+                          elements={templateConfig?.elements || DEFAULT_ELEMENTS}
+                          backgroundColor={templateConfig?.backgroundColor || "#e8ecf1"}
+                          backgroundImage={templateConfig?.background}
+                          cardWidth={cw}
+                          cardHeight={ch}
+                          data={{
+                            id: r.id,
+                            name: r.name,
+                            teamName: r.teamName,
+                            collegeName: r.collegeName,
+                            track: r.track,
+                            photo: r.photo,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
