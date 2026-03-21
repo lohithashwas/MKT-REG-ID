@@ -139,6 +139,30 @@ const TemplatePreviewCard = ({
         return <div key={el.id} style={textStyle}>{data.id}</div>;
       case "customText":
         return <div key={el.id} style={textStyle}>{el.textContent || ""}</div>;
+      case "customImage":
+        return el.imageSrc ? (
+          <div
+            key={el.id}
+            style={{
+              position: "absolute",
+              left: `${el.x}px`,
+              top: `${el.y}px`,
+              width: `${el.width}px`,
+              height: `${el.height}px`,
+            }}
+          >
+            <img
+              src={el.imageSrc}
+              alt={el.label}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: el.objectFit || "cover",
+                borderRadius: el.borderRadius ? `${el.borderRadius}px` : undefined,
+              }}
+            />
+          </div>
+        ) : null;
       default:
         return null;
     }

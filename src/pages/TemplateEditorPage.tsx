@@ -105,6 +105,23 @@ const TemplateEditorPage = () => {
     setSelectedId(newEl.id);
   };
 
+  const addCustomImage = () => {
+    const newEl: TemplateElement = {
+      id: `img-${Date.now()}`,
+      type: "customImage",
+      label: "Custom Image",
+      x: 60,
+      y: 100,
+      width: 80,
+      height: 60,
+      borderRadius: 4,
+      visible: true,
+      objectFit: "cover",
+    };
+    setElements((prev) => [...prev, newEl]);
+    setSelectedId(newEl.id);
+  };
+
   const applyLayout = (layoutIdx: number) => {
     const layout = PREDEFINED_LAYOUTS[layoutIdx];
     setElements(layout.elements.map((el) => ({ ...el })));
@@ -291,14 +308,24 @@ const TemplateEditorPage = () => {
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               Add Elements
             </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start h-8 text-xs"
-              onClick={addCustomText}
-            >
-              <Plus className="w-3 h-3 mr-1.5" /> Custom Text
-            </Button>
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={addCustomText}
+              >
+                <Plus className="w-3 h-3 mr-1.5" /> Custom Text
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start h-8 text-xs"
+                onClick={addCustomImage}
+              >
+                <Image className="w-3 h-3 mr-1.5" /> Custom Image
+              </Button>
+            </div>
           </div>
 
           <div>

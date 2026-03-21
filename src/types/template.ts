@@ -7,7 +7,8 @@ export type ElementType =
   | "barcode"
   | "eventTitle"
   | "idText"
-  | "customText";
+  | "customText"
+  | "customImage";
 
 export interface TemplateElement {
   id: string;
@@ -27,6 +28,8 @@ export interface TemplateElement {
   letterSpacing?: number;
   textTransform?: "none" | "uppercase" | "lowercase";
   visible: boolean;
+  imageSrc?: string; // base64 for customImage elements
+  objectFit?: "cover" | "contain" | "fill";
 }
 
 export interface TemplateConfig {
