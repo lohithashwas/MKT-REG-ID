@@ -296,6 +296,13 @@ const TemplateEditorPage = () => {
                 className="hidden"
                 onChange={handleBgUpload}
               />
+              <input
+                type="file"
+                ref={addImgInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleAddImageFile}
+              />
               <Button
                 variant="outline"
                 size="sm"
