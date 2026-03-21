@@ -42,6 +42,7 @@ const TemplateEditorPage = () => {
   const [saving, setSaving] = useState(false);
   const [canvasScale] = useState(1.8);
   const bgInputRef = useRef<HTMLInputElement>(null);
+  const addImgInputRef = useRef<HTMLInputElement>(null);
 
   const selectedElement = elements.find((e) => e.id === selectedId) || null;
 
