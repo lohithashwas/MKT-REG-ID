@@ -68,10 +68,12 @@ const ScannerPage = () => {
   const requestRef = useRef<number>();
   const navigate = useNavigate();
 
-  // Load history from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('mkt-scanner-history');
     if (saved) setHistory(JSON.parse(saved));
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
   }, []);
 
   const addToHistory = (id: string, name: string) => {
@@ -82,81 +84,52 @@ const ScannerPage = () => {
   };
 
   const stopScanner = useCallback(() => {
-    if (requestRef.current) {
-      cancelAnimationFrame(requestRef.current);
-    }
-    
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    
     setScanning(false);
     setCameraReady(false);
     setStatus("READY");
   }, []);
 
   const toggleAction = async (actionKey: string) => {
-    if (!scannedData) return;
-    if (scannedData.actions?.[actionKey]) return;
-    
+    if (!scannedData || scannedData.actions?.[actionKey]) return;
     try {
-      await update(ref(database, `registrations/${scannedData.id}/actions`), {
-        [actionKey]: true
-      });
-      
-      setScannedData(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          actions: {
-            ...(prev.actions || {}),
-            [actionKey]: true
-          }
-        };
-      });
-      
-      toast.success("Locked Successfully");
+      await update(ref(database, `registrations/${scannedData.id}/actions`), { [actionKey]: true });
+      setScannedData(prev => prev ? { ...prev, actions: { ...(prev.actions || {}), [actionKey]: true } } : null);
+      toast.success("Success");
       if (navigator.vibrate) navigator.vibrate(50);
-    } catch (e) {
-      toast.error("Operation failed");
+    } catch {
+      toast.error("Error");
     }
   };
 
   const fetchRegistration = useCallback(async (id: string) => {
     if (id === lastScannedId || loading) return;
-    
-    console.log("Found Participant ID:", id);
     setLastScannedId(id);
     setLoading(true);
     setStatus("SUCCESS");
-    
     try {
       const snap = await get(ref(database, `registrations/${id}`));
       if (snap.exists()) {
         const data = snap.val() as Omit<Registration, "id">;
         setScannedData({ id, ...data });
         addToHistory(id, data.name);
-        toast.success(`Verified: ${data.name}`);
+        toast.success(`Found: ${data.name}`);
         if (navigator.vibrate) navigator.vibrate([30, 10, 30]);
       } else {
-        setError(`Not Found: ${id}`);
-        toast.error("Invalid Code");
+        setError(`Unknown ID: ${id}`);
         setScannedData(null);
         setStatus("ERROR");
-        setTimeout(() => {
-          setLastScannedId(null);
-          setStatus("ACTIVE");
-        }, 2500);
+        setTimeout(() => { setLastScannedId(null); setStatus("ACTIVE"); }, 2000);
       }
     } catch {
-      setError("Database Sync Error");
+      setError("Sync Error");
       setStatus("ERROR");
-      setTimeout(() => {
-        setLastScannedId(null);
-        setStatus("ACTIVE");
-      }, 2500);
+      setTimeout(() => { setLastScannedId(null); setStatus("ACTIVE"); }, 2000);
     } finally {
       setLoading(false);
     }
@@ -164,7 +137,6 @@ const ScannerPage = () => {
 
   const scanFrame = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !scanning) return;
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -175,91 +147,65 @@ const ScannerPage = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       let detectedText: string | null = null;
-
-      // Method 1: Hardware-Accelerated BarcodeDetector (Primary)
       // @ts-ignore
       if ('BarcodeDetector' in window) {
         try {
           // @ts-ignore
-          const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'data_matrix'] });
+          const barcodeDetector = new BarcodeDetector({ formats: ['qr_code', 'code_128'] });
           const barcodes = await barcodeDetector.detect(canvas);
-          if (barcodes.length > 0) {
-            detectedText = barcodes[0].rawValue;
-          }
-        } catch (e) {}
+          if (barcodes.length > 0) detectedText = barcodes[0].rawValue;
+        } catch {}
       }
 
-<<<<<<< HEAD
-      // Method 2: jsQR Fallback (Instant JS detection)
       if (!detectedText) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
-        if (code) {
-          detectedText = code.data;
-        }
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        if (code) detectedText = code.data;
       }
 
-      if (detectedText) {
-        fetchRegistration(detectedText);
-      }
+      if (detectedText) fetchRegistration(detectedText);
     }
-
-    if (scanning) {
-      requestRef.current = requestAnimationFrame(scanFrame);
-    }
+    if (scanning) requestRef.current = requestAnimationFrame(scanFrame);
   }, [scanning, fetchRegistration]);
 
   useEffect(() => {
-    if (scanning) {
+    if (scanning && !videoRef.current?.srcObject) {
       const initCamera = async () => {
         try {
-          const constraints = {
-            video: {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              focusMode: { ideal: "continuous" }
-            }
-          };
-=======
-          // Use environment (rear) camera for reliable QR scanning on mobile.
-          await reader.decodeFromConstraints(
-            { video: { facingMode: { ideal: "environment" } } },
-            videoRef.current!,
-            (result, err) => {
-              if (result) {
-                fetchRegistration(result.getText());
-              }
-            }
-          );
->>>>>>> cfbf1ee4d545d38f2d18654a161731da01e2bdd4
+          // SIMPLE CONSTRAINTS: Only use what is absolutely necessary
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+          });
 
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
+            
+            // Apply advanced focus safely after start
+            const track = stream.getVideoTracks()[0];
+            if (track && 'applyConstraints' in track) {
+              const caps = track.getCapabilities() as any;
+              if (caps.focusMode?.includes('continuous')) {
+                track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any).catch(() => {});
+              }
+            }
+
             videoRef.current.onloadedmetadata = () => {
-              videoRef.current?.play();
+              videoRef.current?.play().catch(e => console.error("Play failed", e));
               setCameraReady(true);
               setStatus("ACTIVE");
               requestRef.current = requestAnimationFrame(scanFrame);
             };
           }
-        } catch (err) {
-          console.error("Camera Access Error:", err);
-          setError("Allow camera access to scan.");
+        } catch (err: any) {
+          setError(err.name === 'NotAllowedError' ? "Camera permission denied" : "No camera found");
           setScanning(false);
           setStatus("ERROR");
+          toast.error("Lens failed to engage. Check permissions.");
         }
       };
-
       initCamera();
     }
-    
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
   }, [scanning, scanFrame]);
 
   const startScanner = () => {
@@ -271,44 +217,22 @@ const ScannerPage = () => {
     setStatus("ACTIVE");
   };
 
-  const clearScan = () => {
-    setScannedData(null);
-    setError(null);
-    setLastScannedId(null);
-    setStatus("ACTIVE");
-  };
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (scannerLogin(pin)) {
-      toast.success("Terminal unlocked");
-    } else {
-      toast.error("Invalid Security PIN");
-    }
+    if (scannerLogin(pin)) toast.success("Unlocked");
+    else toast.error("Invalid PIN");
   };
 
   if (!scannerAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0c0f] p-4">
-        <Card className="max-w-sm w-full bg-[#111318] border-white/5 shadow-2xl">
+        <Card className="max-w-sm w-full bg-[#111318] border-white/5">
           <CardContent className="pt-8">
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6">
-              <Zap className="w-8 h-8 text-primary" />
-            </div>
-            <h2 className="text-xl font-bold text-center text-white uppercase tracking-tighter mb-2">Admin Checkpoint</h2>
-            <p className="text-muted-foreground text-sm text-center mb-8">Enter PIN to arm the scanner</p>
+            <Zap className="w-12 h-12 text-primary mx-auto mb-6" />
+            <h2 className="text-xl font-bold text-center text-white mb-6 uppercase tracking-tighter">Security Entry</h2>
             <form onSubmit={handleLogin} className="space-y-4">
-              <Input
-                type="password"
-                placeholder="••••"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                autoFocus
-                className="text-center text-2xl h-14 font-black bg-white/5 border-white/10 text-white"
-              />
-              <Button type="submit" className="w-full h-14 font-black uppercase text-lg bg-primary hover:bg-primary/90 text-black shadow-lg shadow-primary/20">
-                Unlock Terminal
-              </Button>
+              <Input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} autoFocus className="text-center text-2xl h-14 bg-white/5 border-white/10" />
+              <Button type="submit" className="w-full h-14 font-black uppercase text-lg">Access Camera</Button>
             </form>
           </CardContent>
         </Card>
@@ -317,126 +241,81 @@ const ScannerPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0c0f] text-white overflow-x-hidden">
-      {/* Header */}
+    <div className="min-h-screen bg-[#0a0c0f] text-white">
       <div className="sticky top-0 z-50 bg-[#111318]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => { stopScanner(); navigate("/admin"); }} className="text-white/40 hover:text-white">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Back
-          </Button>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black tracking-widest ${
-            status === "ACTIVE" ? "border-primary/50 bg-primary/10 text-primary" : 
-            status === "SUCCESS" ? "border-green-500 bg-green-500/10 text-green-500" :
-            status === "ERROR" ? "border-red-500 bg-red-500/10 text-red-500" :
-            "border-white/10 bg-white/5 text-white/40"
-          }`}>
-            <div className={`w-1.5 h-1.5 rounded-full bg-current ${status === "ACTIVE" ? "animate-pulse" : ""}`} />
-            {status}
-          </div>
+        <Button variant="ghost" size="sm" onClick={() => { stopScanner(); navigate("/admin"); }}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> EXIT
+        </Button>
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black ${
+          status === "ACTIVE" ? "border-primary/50 text-primary" : status === "SUCCESS" ? "border-green-500 text-green-500" : "border-white/10 text-white/40"
+        }`}>
+          <div className={`w-1.5 h-1.5 rounded-full bg-current ${status === "ACTIVE"?"animate-pulse":""}`} />
+          {status}
         </div>
-        <div className="flex gap-2">
+        <div>
           {scanning ? (
-            <Button variant="outline" size="sm" onClick={stopScanner} className="h-8 border-red-500/50 text-red-500 hover:bg-red-500/10">
-              <CameraOff className="w-4 h-4 mr-1" /> Stop
-            </Button>
+            <Button variant="destructive" size="sm" onClick={stopScanner} className="h-8">STOP</Button>
           ) : (
-            <Button size="sm" onClick={startScanner} className="h-8 bg-primary text-black font-bold">
-              <Camera className="w-4 h-4 mr-1" /> Start
-            </Button>
+            <Button size="sm" onClick={startScanner} className="h-8 bg-primary text-black font-bold">START</Button>
           )}
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto p-4 space-y-6 pb-24">
-        {/* Scanner Viewport */}
+      <div className="max-w-xl mx-auto p-4 space-y-6">
         <div className="relative rounded-[2.5rem] overflow-hidden bg-black aspect-square border-[6px] border-white/5 shadow-2xl">
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover grayscale-[20%]"
-            muted
-            playsInline
-          />
+          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
           <canvas ref={canvasRef} className="hidden" />
           
           {scanning && !scannedData && (
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-64 border-2 border-primary/30 rounded-[2rem] relative overflow-hidden backdrop-blur-[1px]">
+              <div className="w-64 h-64 border-2 border-primary/20 rounded-[2rem] relative overflow-hidden">
                 <div className="absolute inset-x-4 top-0 h-[2px] bg-primary animate-scan-line shadow-[0_0_15px_#00e5a0]" />
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-primary rounded-tl-xl" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-primary rounded-tr-xl" />
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-primary rounded-bl-xl" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-primary rounded-br-xl" />
               </div>
             </div>
           )}
 
-          {!scanning && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 opacity-20">
-              <ScanLine className="w-16 h-16" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Ready to Arm</p>
-            </div>
-          )}
-
           {scanning && !cameraReady && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c0f] gap-4 z-20">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black gap-4 z-20">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Hardware Sink...</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Hardware Sink...</p>
             </div>
           )}
         </div>
 
         {error && (
-          <div className="flex items-center gap-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl p-4 text-xs font-bold uppercase animate-in slide-in-from-top">
-            <X className="w-5 h-5 shrink-0" /> <p className="flex-1">{error}</p>
-            <Button size="sm" variant="ghost" onClick={startScanner} className="h-7 text-[10px] hover:bg-red-500/20">Retry</Button>
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center gap-3 text-red-500 font-bold">
+            <X className="w-5 h-5 shrink-0" /> <p className="text-xs uppercase flex-1">{error}</p>
+            <Button size="sm" variant="ghost" onClick={startScanner} className="text-xs">Retry</Button>
           </div>
         )}
 
-        {/* Results Area */}
         <div className="space-y-4">
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-6 py-20 bg-white/5 border border-white/10 rounded-[3rem]">
-              <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Polling Registry...</p>
+            <div className="py-20 flex flex-col items-center justify-center bg-white/5 rounded-[3rem]">
+              <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+              <p className="text-[10px] font-black uppercase opacity-40">Syncing Record...</p>
             </div>
           ) : scannedData ? (
-            <Card className="bg-[#111318] border-2 border-primary/20 shadow-[0_0_50px_-12px_rgba(0,229,160,0.25)] rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
+            <Card className="bg-[#111318] border-2 border-primary/20 rounded-[2.5rem] overflow-hidden animate-in zoom-in-95">
               <CardContent className="p-0">
-                <div className={`px-6 py-3 text-[10px] font-black tracking-[0.25em] uppercase flex items-center justify-between ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-600" : "bg-rose-600"} text-white`}>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Checked-In
-                  </div>
+                <div className={`px-6 py-3 text-[10px] font-black uppercase flex items-center justify-between ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-600" : "bg-rose-600"} text-white`}>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5" /> Verified</div>
                   <span className="opacity-60 font-mono">#{scannedData.id.slice(-6)}</span>
                 </div>
 
                 <div className="p-6">
-                  <div className="flex gap-6 items-start">
-                    <div className="w-24 h-32 rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex-shrink-0 grayscale-[15%]">
-                      <img
-                        src={scannedData.photo}
-                        alt={scannedData.name}
-                        className="w-full h-full object-cover contrast-[1.05]"
-                        crossOrigin="anonymous"
-                      />
+                  <div className="flex gap-5 items-start">
+                    <div className="w-24 h-32 rounded-2xl overflow-hidden border border-white/10 flex-shrink-0">
+                      <img src={scannedData.photo} alt={scannedData.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                     </div>
-
                     <div className="flex-1 min-w-0 pt-1">
                       <div className="mb-4">
-                        <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Participant</p>
-                        <h4 className="font-display font-black text-xl text-white leading-tight uppercase break-words line-clamp-2">
-                          {scannedData.name}
-                        </h4>
+                        <p className="text-[9px] font-black text-white/30 uppercase mb-1">Participant</p>
+                        <h4 className="font-display font-black text-xl text-white leading-tight uppercase break-words line-clamp-2">{scannedData.name}</h4>
                       </div>
-
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="min-w-0">
-                          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-0.5">Team</p>
-                          <p className="font-bold text-xs text-white truncate">{scannedData.teamName}</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-0.5">Category</p>
-                          <p className="font-bold text-xs text-white truncate">{scannedData.track}</p>
-                        </div>
+                        <div><p className="text-[9px] font-black text-white/30 truncate">TEAM: {scannedData.teamName}</p></div>
+                        <div><p className="text-[9px] font-black text-white/30 truncate">ROLE: {scannedData.track}</p></div>
                       </div>
                     </div>
                   </div>
@@ -444,135 +323,70 @@ const ScannerPage = () => {
                   <div className="mt-6 pt-4 border-t border-white/5">
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="secondary" size="sm" className="w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] bg-white/5 hover:bg-white/10 border-0 rounded-2xl">
-                          <Info className="w-4 h-4 mr-2" /> Extended Metadata
+                        <Button variant="secondary" size="sm" className="w-full h-10 text-[10px] font-black uppercase bg-white/5 rounded-2xl">
+                          <Info className="w-4 h-4 mr-2" /> Metadata
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-sm rounded-[2.5rem] bg-[#0a0c0f] border-white/10 text-white">
-                        <DialogHeader>
-                          <DialogTitle className="text-xl font-bold uppercase tracking-tight">Full Registry View</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 pt-6 text-sm font-medium">
-                          <div className="flex justify-between border-b border-white/5 pb-2">
-                            <span className="text-white/40 uppercase text-[10px] font-black">Record ID</span>
-                            <span className="font-mono font-bold text-primary">{scannedData.id}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-2">
-                            <span className="text-white/40 uppercase text-[10px] font-black">Organization</span>
-                            <span className="text-right leading-tight max-w-[200px]">{scannedData.collegeName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-white/40 uppercase text-[10px] font-black">Sync Date</span>
-                            <span>{new Date(scannedData.registeredAt).toLocaleString()}</span>
-                          </div>
+                      <DialogContent className="max-w-sm rounded-[2rem] bg-[#0a0c0f] border-white/10 text-white">
+                        <DialogHeader><DialogTitle className="uppercase font-bold">Registry Info</DialogTitle></DialogHeader>
+                        <div className="space-y-4 pt-4 text-xs font-mono">
+                          <p>ID: {scannedData.id}</p>
+                          <p>ORG: {scannedData.collegeName}</p>
+                          <p>SYNC: {new Date(scannedData.registeredAt).toLocaleString()}</p>
                         </div>
                       </DialogContent>
                     </Dialog>
                   </div>
                 </div>
 
-                <div className="bg-black/40 px-6 py-6 flex flex-col gap-6">
-                  {/* Attendance */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-4 px-1">
-                      <CalendarCheck2 className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Attendance Status</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => {
-                        const isLocked = scannedData.actions?.[key] || false;
-                        return (
-                          <Button
-                            key={key}
-                            variant="outline"
-                            size="sm"
-                            disabled={isLocked}
-                            className={`h-10 px-4 rounded-2xl border-white/10 font-bold transition-all text-[10px] uppercase ${
-                              isLocked ? 'bg-primary text-black border-primary opacity-100' : 'bg-transparent text-white/60 hover:bg-white/5'
-                            }`}
-                            onClick={() => toggleAction(key)}
-                          >
-                            {isLocked ? <Lock className="w-3 h-3 mr-1.5" /> : null} {key.replace('_', ' ')}
-                          </Button>
-                        );
-                      })}
-                    </div>
+                <div className="bg-black/40 p-6 flex flex-col gap-5">
+                  <div className="flex flex-wrap gap-2 uppercase font-black text-[10px]">
+                    {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => {
+                      const isLocked = scannedData.actions?.[key] || false;
+                      return (
+                        <Button key={key} variant="outline" size="sm" disabled={isLocked} className={`h-9 px-4 rounded-xl ${isLocked ? 'bg-primary text-black' : 'text-white'}`} onClick={() => toggleAction(key)}>
+                          {isLocked && <Lock className="w-3 h-3 mr-1" />} {key.replace('_',' ')}
+                        </Button>
+                      );
+                    })}
                   </div>
-
-                  {/* Meals */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-4 px-1">
-                      <Utensils className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Catering Vouchers</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { id: 'day_1_lunch', label: 'D1 LUNCH' },
-                        { id: 'day_1_dinner', label: 'D1 DINNER' },
-                        { id: 'day_2_breakfast', label: 'D2 B-FAST' },
-                        { id: 'day_2_lunch', label: 'D2 LUNCH' }
-                      ].map((meal) => {
-                        const isLocked = scannedData.actions?.[meal.id] || false;
-                        return (
-                          <Button
-                            key={meal.id}
-                            variant="outline"
-                            size="sm"
-                            disabled={isLocked}
-                            className={`h-12 justify-start px-4 rounded-xl border-white/10 font-bold transition-all text-[10px] ${
-                              isLocked ? 'bg-blue-600 text-white border-blue-600 opacity-100' : 'bg-transparent text-white/60 hover:bg-white/5'
-                            }`}
-                            onClick={() => toggleAction(meal.id)}
-                          >
-                            <div className={`w-1.5 h-1.5 rounded-full mr-3 ${isLocked ? "bg-white" : "bg-primary/40"}`} />
-                            {meal.label} {isLocked && <Lock className="ml-auto w-3 h-3 opacity-40" />}
-                          </Button>
-                        );
-                      })}
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 uppercase font-black text-[10px]">
+                    {['day_1_lunch', 'day_1_dinner', 'day_2_breakfast', 'day_2_lunch'].map((id) => {
+                      const isLocked = scannedData.actions?.[id] || false;
+                      return (
+                        <Button key={id} variant="outline" size="sm" disabled={isLocked} className={`h-10 px-4 rounded-xl ${isLocked ? 'bg-blue-600' : 'text-white'}`} onClick={() => toggleAction(id)}>
+                          {id.replace(/_/g,' ')} {isLocked && <Lock className="ml-auto w-3 h-3 opacity-40"/>}
+                        </Button>
+                      );
+                    })}
                   </div>
-
-                  <Button 
-                    onClick={clearScan} 
-                    className="w-full h-16 bg-primary text-black font-black uppercase tracking-[0.3em] mt-2 shadow-[0_0_30px_-5px_rgba(0,229,160,0.4)] rounded-2xl group text-sm italic"
-                  >
-                    READY FOR NEXT SCAN <ChevronRight className="w-5 h-5 ml-1 group-hover:translate-x-1 transition-transform" />
-                  </Button>
+                  <Button onClick={() => setScannedData(null)} className="w-full h-14 bg-primary text-black font-black uppercase tracking-widest rounded-2xl">NEXT SCAN</Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-6">
-              <div className="flex flex-col items-center justify-center gap-8 py-20 bg-white/5 border border-white/10 rounded-[3rem] text-center px-12 group overflow-hidden">
-                <div className="relative">
-                  <ScanLine className="w-16 h-16 text-primary opacity-20 absolute animate-ping" />
-                  <ScanLine className="w-16 h-16 text-primary opacity-40 relative" />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-black tracking-[0.3em] text-white uppercase italic">Zero Latency Active</p>
-                  <p className="text-[11px] text-white/30 leading-relaxed max-w-[200px] mx-auto uppercase font-mono">
-                    Align the badge QR within guides for 100ms lock-on.
-                  </p>
-                </div>
+            <div className="flex flex-col items-center justify-center gap-7 py-20 bg-white/5 border border-white/10 rounded-[3rem] text-center px-10 group overflow-hidden">
+              <ScanLine className="w-12 h-12 text-primary opacity-30 animate-pulse" />
+              <div>
+                <p className="text-sm font-black tracking-[0.2em] text-white uppercase italic mb-2">Zero Latency Active</p>
+                <p className="text-[10px] text-white/30 uppercase max-w-[200px] mx-auto font-mono">Align badge QR for 100ms lock-on</p>
               </div>
-              
-              {/* Recent History Mini-List */}
-              {history.length > 0 && (
-                <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
-                  <div className="flex items-center gap-2 mb-4 text-white/40">
-                    <History className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Recent Check-ins</span>
+            </div>
+          )}
+
+          {history.length > 0 && !scannedData && (
+            <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6">
+              <div className="flex items-center gap-2 mb-4 text-white/20 text-[10px] font-black uppercase">
+                <History className="w-4 h-4" /> Recent Activities
+              </div>
+              <div className="space-y-2">
+                {history.map((entry, i) => (
+                  <div key={i} className="flex justify-between text-[10px] font-bold opacity-40">
+                    <span className="truncate max-w-[150px]">{entry.name}</span>
+                    <span>{new Date(entry.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                   </div>
-                  <div className="space-y-3">
-                    {history.map((entry, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs py-2 border-b border-white/5 last:border-0 opacity-60">
-                        <span className="font-bold truncate max-w-[150px]">{entry.name}</span>
-                        <span className="font-mono text-[10px]">{new Date(entry.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
         </div>
