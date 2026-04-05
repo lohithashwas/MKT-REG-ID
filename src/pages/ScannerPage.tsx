@@ -96,9 +96,7 @@ const ScannerPage = () => {
     setLastScannedId(null);
 
     try {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
-      const reader = new BrowserMultiFormatReader(hints);
+      const reader = new BrowserMultiFormatReader();
       readerRef.current = reader;
 
       const devices = await reader.listVideoInputDevices();
@@ -115,15 +113,7 @@ const ScannerPage = () => {
         return;
       }
 
-      const constraints = {
-        video: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        } as any
-      };
-
-      reader.decodeFromConstraints(constraints, videoRef.current!, (result, err) => {
+      reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
         if (result) {
           const text = result.getText();
           fetchRegistration(text);
@@ -136,7 +126,7 @@ const ScannerPage = () => {
       setCameraReady(true);
     } catch (e) {
       console.error(e);
-      setError("Could not launch scanner. Please allow camera permission.");
+      setError("Could not access camera. Please allow camera permission.");
       setScanning(false);
     }
   }, [fetchRegistration]);
