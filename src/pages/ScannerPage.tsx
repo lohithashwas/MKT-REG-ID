@@ -58,6 +58,17 @@ const ScannerPage = () => {
       readerRef.current.reset();
       readerRef.current = null;
     }
+    
+    // Explicitly stop and release the camera hardware
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log("Stopped camera track:", track.label);
+      });
+      videoRef.current.srcObject = null;
+    }
+    
     setScanning(false);
     setCameraReady(false);
   }, []);
@@ -92,10 +103,14 @@ const ScannerPage = () => {
   };
 
   const fetchRegistration = useCallback(async (id: string) => {
-    if (id === lastScannedId) return;
+    // Avoid double-fetching or rescanning the same ID immediately
+    if (id === lastScannedId || loading) return;
+    
+    console.log("Found ID:", id);
     setLastScannedId(id);
     setLoading(true);
     setError(null);
+    
     try {
       const snap = await get(ref(database, `registrations/${id}`));
       if (snap.exists()) {
@@ -104,21 +119,25 @@ const ScannerPage = () => {
         toast.success(`Found: ${data.name}`);
         if (navigator.vibrate) navigator.vibrate(100);
       } else {
-        setError("Registration not found for this barcode.");
-        toast.error("Registration not found");
+        setError("Registration not found for this code.");
+        toast.error("Code not recognized");
         setScannedData(null);
+        // Allow re-scanning after a short delay if not found
+        setTimeout(() => setLastScannedId(null), 2000);
       }
-    } catch {
-      setError("Failed to fetch registration. Check your connection.");
-      toast.error("Lookup failed");
+    } catch (e) {
+      setError("Sync failed. Check connection.");
+      toast.error("Database sync error");
       setScannedData(null);
+      setTimeout(() => setLastScannedId(null), 2000);
     } finally {
       setLoading(false);
     }
-  }, [lastScannedId]);
+  }, [lastScannedId, loading]);
 
   useEffect(() => {
     return () => {
+      // Emergency cleanup on unmount
       if (readerRef.current) {
         readerRef.current.reset();
       }
@@ -127,16 +146,16 @@ const ScannerPage = () => {
 
   useEffect(() => {
     if (scanning && videoRef.current && !readerRef.current) {
-      let nativeInterval: any = null;
-
       const initScanner = async () => {
         try {
           const hints = new Map();
           hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.QR_CODE,
             BarcodeFormat.CODE_128,
+            BarcodeFormat.DATA_MATRIX
           ]);
           hints.set(DecodeHintType.TRY_HARDER, true);
+          
           const reader = new BrowserMultiFormatReader(hints);
           readerRef.current = reader;
 
@@ -149,53 +168,36 @@ const ScannerPage = () => {
           const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
 
           if (devices.length === 0) {
-            setError("No camera found on this device.");
+            setError("No camera found.");
             setScanning(false);
             return;
           }
 
-          // Native scan bridge for "Instant" hardware-accelerated scanning where supported
-          if ("BarcodeDetector" in window) {
-            try {
-              // @ts-ignore
-              const detector = new BarcodeDetector({ formats: ["qr_code", "code_128"] });
-              const checkNative = async () => {
-                if (!videoRef.current || !scanning) return;
-                try {
-                  const barcodes = await detector.detect(videoRef.current);
-                  if (barcodes.length > 0) {
-                    fetchRegistration(barcodes[0].rawValue);
-                  }
-                } catch (e) {}
-                if (scanning) nativeInterval = requestAnimationFrame(checkNative);
-              };
-              checkNative();
-            } catch (e) {
-              console.warn("Native scanner init failed:", e);
-            }
-          }
+          console.log("Starting scanner with device:", backCamera?.label || "Primary");
 
-          reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
+          // Start the unified scanning engine
+          await reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
             if (result) {
               fetchRegistration(result.getText());
             }
             if (err && !(err instanceof NotFoundException)) {
-              console.warn(err);
+              console.warn("Scan loop note:", err);
             }
           });
+
+          // Mobile browsers often need an explicit play() call even with autoPlay
+          try {
+            await videoRef.current.play();
+          } catch (e) {}
 
           setCameraReady(true);
         } catch (e) {
           console.error("Scanner Error:", e);
-          setError("Could not access camera. Please allow camera permission.");
+          setError("Allow camera access to scan.");
           setScanning(false);
         }
       };
       initScanner();
-
-      return () => {
-        if (nativeInterval) cancelAnimationFrame(nativeInterval);
-      };
     }
   }, [scanning, fetchRegistration, stopScanner]);
 
@@ -230,12 +232,12 @@ const ScannerPage = () => {
                 <ScanLine className="w-8 h-8 text-primary" />
               </div>
               <h2 className="font-display text-2xl font-bold mb-1">Scanner Access</h2>
-              <p className="text-muted-foreground text-sm">Enter PIN to access the barcode scanner</p>
+              <p className="text-muted-foreground text-sm">Enter PIN to access the scanner</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
               <Input
                 type="password"
-                placeholder="Enter scanner PIN"
+                placeholder="Scanner PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 id="scanner-pin"
@@ -243,10 +245,10 @@ const ScannerPage = () => {
               />
               <Button type="submit" className="w-full h-11 font-semibold">
                 <Shield className="w-4 h-4 mr-2" />
-                Unlock Scanner
+                Unlock
               </Button>
               <Button type="button" variant="ghost" className="w-full" onClick={() => navigate("/admin")}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back to Admin
+                <ArrowLeft className="w-4 h-4 mr-1" /> Back
               </Button>
             </form>
           </CardContent>
@@ -264,17 +266,17 @@ const ScannerPage = () => {
           </Button>
           <div className="flex items-center gap-2 text-sm font-medium">
             <ScanLine className="w-4 h-4 text-primary" />
-            <span>ID Card Scanner</span>
+            <span>ID Scanner</span>
           </div>
         </div>
         <div className="flex gap-2">
           {scanning ? (
             <Button variant="outline" size="sm" onClick={stopScanner}>
-              <CameraOff className="w-4 h-4 mr-1" /> Stop Camera
+              <CameraOff className="w-4 h-4 mr-1" /> Stop
             </Button>
           ) : (
             <Button size="sm" onClick={startScanner}>
-              <Camera className="w-4 h-4 mr-1" /> Start Camera
+              <Camera className="w-4 h-4 mr-1" /> Start
             </Button>
           )}
         </div>
@@ -282,7 +284,16 @@ const ScannerPage = () => {
 
       <div className="max-w-4xl mx-auto p-4 grid md:grid-cols-2 gap-6 pb-20">
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Live Camera Feed</h3>
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Camera Feed</h3>
+            {scanning && cameraReady && (
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-500 uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                Active
+              </span>
+            )}
+          </div>
+          
           <div className="relative rounded-3xl overflow-hidden bg-black aspect-[4/3] border border-border shadow-2xl group">
             <video
               ref={videoRef}
@@ -309,14 +320,14 @@ const ScannerPage = () => {
                 <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center shadow-lg">
                   <Camera className="w-8 h-8 opacity-40 text-primary" />
                 </div>
-                <p className="text-sm font-medium">Ready to start scanning</p>
+                <p className="text-sm font-medium">Click "Start" to scan</p>
               </div>
             )}
 
             {scanning && !cameraReady && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md text-white gap-4">
                 <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                <p className="text-sm font-medium tracking-tight">Accessing camera hardware...</p>
+                <p className="text-sm font-medium tracking-tight">Lens initializing...</p>
               </div>
             )}
           </div>
@@ -324,7 +335,7 @@ const ScannerPage = () => {
           {scanning && cameraReady && (
             <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 text-center">
               <p className="text-[13px] text-muted-foreground">
-                Position the <span className="text-primary font-bold">QR Code</span> or <span className="text-primary font-bold">Barcode</span> inside the frame for instant detection.
+                Position any <span className="text-primary font-bold">QR</span> or <span className="text-primary font-bold">ID Code</span> inside the frame for instant detection.
               </p>
             </div>
           )}
@@ -339,10 +350,10 @@ const ScannerPage = () => {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Scanning Result</h3>
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Results</h3>
             {scannedData && (
               <Button variant="ghost" size="sm" onClick={clearScan} className="h-8 text-xs font-bold hover:bg-primary/10 hover:text-primary">
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> RE-SCAN
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> RESET
               </Button>
             )}
           </div>
@@ -350,14 +361,14 @@ const ScannerPage = () => {
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24 bg-muted/20 border-2 border-dashed border-border rounded-[2rem]">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-sm font-semibold text-muted-foreground">Syncing with database...</p>
+              <p className="text-sm font-semibold text-muted-foreground">Syncing records...</p>
             </div>
           ) : scannedData ? (
             <Card className="glass-card overflow-hidden border-primary/20 shadow-2xl animate-in slide-in-from-right duration-500">
               <CardContent className="p-0">
                 <div className={`px-6 py-3 text-[11px] font-black tracking-[0.2em] uppercase flex items-center gap-2 ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-500 text-white" : "bg-rose-500 text-white"}`}>
                   <CheckCircle2 className="w-4 h-4 ml-[-2px]" />
-                  Verified Participant
+                  Authorized Entry
                 </div>
 
                 <div className="p-6">
@@ -373,7 +384,7 @@ const ScannerPage = () => {
 
                     <div className="flex-1 space-y-4 pt-1">
                       <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Full Name</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Participant</p>
                         <h4 className="font-display font-black text-2xl leading-none text-foreground tracking-tight uppercase">{scannedData.name}</h4>
                       </div>
 
@@ -383,13 +394,13 @@ const ScannerPage = () => {
                           <p className="font-bold text-sm text-foreground truncate">{scannedData.teamName}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Track</p>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Category</p>
                           <p className="font-bold text-sm text-foreground">{scannedData.track}</p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">College / Organization</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Affiliation</p>
                         <p className="text-sm font-medium text-muted-foreground italic leading-tight uppercase">{scannedData.collegeName}</p>
                       </div>
                     </div>
@@ -401,7 +412,7 @@ const ScannerPage = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <CalendarCheck2 className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attendance</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attendance Log</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => (
@@ -409,7 +420,7 @@ const ScannerPage = () => {
                           key={key}
                           variant={scannedData.actions?.[key] ? "default" : "outline"}
                           size="sm"
-                          className="h-8 text-[10px] font-bold px-3"
+                          className="h-8 text-[10px] font-bold px-3 transition-all duration-300 transform active:scale-95"
                           onClick={() => toggleAction(key)}
                         >
                           {key.replace('_', ' ')}
@@ -422,7 +433,7 @@ const ScannerPage = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Utensils className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Food Vouchers</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Meal Vouchers</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       {[
@@ -435,7 +446,7 @@ const ScannerPage = () => {
                           key={meal.id}
                           variant={scannedData.actions?.[meal.id] ? "default" : "outline"}
                           size="sm"
-                          className="h-9 text-[10px] font-bold justify-start px-3"
+                          className="h-9 text-[10px] font-bold justify-start px-3 transition-all duration-300"
                           onClick={() => toggleAction(meal.id)}
                         >
                           <div className={`w-2 h-2 rounded-full mr-2 ${scannedData.actions?.[meal.id] ? "bg-white" : "bg-primary/30"}`} />
@@ -445,7 +456,7 @@ const ScannerPage = () => {
                     </div>
                   </div>
 
-                  {/* Identification & Time */}
+                  {/* Identification Branding */}
                   <div className="pt-2 flex items-center justify-between opacity-60">
                     <div className="flex items-center gap-2 text-primary">
                       <Tag className="w-4 h-4" />
@@ -456,12 +467,12 @@ const ScannerPage = () => {
                     </div>
                   </div>
 
-                  {/* Next Scan Action */}
+                  {/* Workflow Lock Action */}
                   <Button 
                     onClick={clearScan} 
-                    className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-black tracking-widest uppercase mt-2 shadow-lg shadow-primary/20 group"
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-black tracking-widest uppercase mt-2 shadow-lg shadow-primary/20 group animate-in slide-in-from-bottom duration-500"
                   >
-                    NEXT SCAN <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    NEXT ENTRY <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
               </CardContent>
@@ -473,7 +484,7 @@ const ScannerPage = () => {
               </div>
               <div>
                 <p className="text-base font-black tracking-tight text-foreground">AWAITING SCAN...</p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto leading-relaxed">Please align any participant ID inside the camera guide.</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto leading-relaxed">System is armed and ready. Align code in guide.</p>
               </div>
             </div>
           )}
