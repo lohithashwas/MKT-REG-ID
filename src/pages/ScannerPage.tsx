@@ -120,7 +120,7 @@ const ScannerPage = () => {
         return;
       }
 
-      await reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
+      reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
         if (result) {
           const text = result.getText();
           fetchRegistration(text);
