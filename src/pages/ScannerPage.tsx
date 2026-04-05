@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { BrowserMultiFormatReader, NotFoundException, BarcodeFormat, DecodeHintType } from "@zxing/library";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 interface Registration {
   id: string;
@@ -43,14 +43,19 @@ const ScannerPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastScannedId, setLastScannedId] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const navigate = useNavigate();
 
   const stopScanner = useCallback(() => {
-    if (readerRef.current) {
-      readerRef.current.reset();
-      readerRef.current = null;
+    if (html5QrCodeRef.current) {
+      try {
+        html5QrCodeRef.current.stop().then(() => {
+          html5QrCodeRef.current?.clear();
+          html5QrCodeRef.current = null;
+        }).catch(err => console.error(err));
+      } catch (e) {
+        console.error(e);
+      }
     }
     setScanning(false);
     setCameraReady(false);
@@ -88,57 +93,36 @@ const ScannerPage = () => {
   }, [lastScannedId]);
 
   const startScanner = useCallback(async () => {
-    if (!videoRef.current) return;
     setScanning(true);
+    setCameraReady(false);
     setError(null);
     setScannedData(null);
     setLastScannedId(null);
 
     try {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
-      const reader = new BrowserMultiFormatReader(hints);
-      readerRef.current = reader;
-
-      // listVideoInputDevices is an instance method in @zxing/library
-      const devices = await reader.listVideoInputDevices();
-      // prefer back camera
-      const backCamera = devices.find((d) =>
-        d.label.toLowerCase().includes("back") ||
-        d.label.toLowerCase().includes("rear") ||
-        d.label.toLowerCase().includes("environment")
-      );
-      const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
-
-      if (devices.length === 0) {
-        setError("No camera found on this device.");
-        setScanning(false);
-        return;
-      }
-
-      const constraints = {
-        video: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        } as any
-      };
-
-      reader.decodeFromConstraints(constraints, videoRef.current!, (result, err) => {
-        if (result) {
-          const text = result.getText();
-          fetchRegistration(text);
-        }
-        if (err && !(err instanceof NotFoundException)) {
-          // non-trivial errors only
-          console.warn(err);
-        }
+      const html5QrCode = new Html5Qrcode("reader", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
+        verbose: false,
       });
+      html5QrCodeRef.current = html5QrCode;
 
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 100 },
+        },
+        (decodedText) => {
+          fetchRegistration(decodedText);
+        },
+        () => {
+          // parse errors ignore
+        }
+      );
       setCameraReady(true);
     } catch (e) {
       console.error(e);
-      setError("Could not access camera. Please allow camera permission.");
+      setError("Could not launch scanner. Please allow camera permission.");
       setScanning(false);
     }
   }, [fetchRegistration]);
@@ -247,12 +231,10 @@ const ScannerPage = () => {
               </>
             )}
 
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              style={{ display: scanning ? "block" : "none" }}
+            <div
+              id="reader"
+              className="w-full h-full object-cover [&>video]:w-full [&>video]:h-full [&>video]:object-cover"
+              style={{ display: scanning ? "block" : "none", border: "none" }}
             />
 
             {!scanning && (
