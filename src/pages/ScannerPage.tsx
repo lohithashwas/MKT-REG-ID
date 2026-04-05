@@ -103,6 +103,7 @@ const ScannerPage = () => {
         BarcodeFormat.QR_CODE,
         BarcodeFormat.CODE_128,
       ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
       const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
 
