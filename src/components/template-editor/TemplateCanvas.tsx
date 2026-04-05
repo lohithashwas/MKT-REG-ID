@@ -31,7 +31,7 @@ const EditorBarcode = ({ value }: { value: string }) => {
       try {
         JsBarcode(canvasRef.current, value, {
           format: "CODE128",
-          width: 2,
+          width: 1.5,
           height: 35,
           displayValue: false,
           margin: 10,
