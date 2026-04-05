@@ -136,19 +136,6 @@ const ScannerPage = () => {
       setTimeout(() => { setLastScannedId(null); setStatus("ACTIVE"); setError(null); }, 3000);
     } finally {
       setLoading(false);
-      // Auto-clear for High-Volume (300+ people) flow
-      setTimeout(() => {
-        setScannedData(prev => {
-          if (prev && prev.id === id) {
-             // Only clear if we haven't scanned someone else in between
-             // setScannedData(null); 
-             // actually, better to just keep it showing but re-arm lastScannedId
-          }
-          return prev;
-        });
-        // We don't null the data yet so staff can see it, but we allow new scans
-        setLastScannedId(null); 
-      }, 2500);
     }
   }, [lastScannedId, loading, history]);
 
@@ -410,7 +397,6 @@ const ScannerPage = () => {
                   <Button onClick={clearScan} className="w-full h-20 bg-primary text-black font-black uppercase tracking-[0.35em] mt-2 shadow-[0_0_50px_rgba(0,229,160,0.4)] rounded-[2rem] group text-xl italic hover:scale-[1.02] active:scale-95 transition-all">
                     NEXT SCAN <ChevronRight className="w-7 h-7 ml-2 group-hover:translate-x-2 transition-transform" />
                   </Button>
-                  <p className="text-[9px] text-center text-white/20 uppercase font-black tracking-widest mt-4 animate-pulse">Auto-Rearm Active: 2.5s</p>
                 </div>
               </CardContent>
             </Card>
