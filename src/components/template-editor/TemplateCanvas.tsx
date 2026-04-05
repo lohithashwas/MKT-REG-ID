@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import JsBarcode from "jsbarcode";
+import { QRCodeSVG } from "qrcode.react";
 import { TemplateElement, CARD_WIDTH, CARD_HEIGHT } from "@/types/template";
 import DraggableElement from "./DraggableElement";
 
@@ -143,6 +144,18 @@ const TemplateCanvas = ({
             }}
           >
             No Image
+          </div>
+        );
+      case "qrCode":
+        return (
+          <div style={{ width: "100%", height: "100%", padding: "4px", backgroundColor: "#fff", borderRadius: el.borderRadius ? `${el.borderRadius}px` : "2px" }}>
+            <QRCodeSVG 
+              value={SAMPLE_DATA.id} 
+              size={Math.min(el.width, el.height) - 8}
+              level="H"
+              includeMargin={false}
+              style={{ width: "100%", height: "100%", display: "block" }}
+            />
           </div>
         );
       default:

@@ -5,6 +5,7 @@ export type ElementType =
   | "collegeName"
   | "track"
   | "barcode"
+  | "qrCode"
   | "eventTitle"
   | "idText"
   | "customText"

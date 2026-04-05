@@ -13,6 +13,7 @@ import {
   Image,
   Shield,
   Eye,
+  QrCode,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
@@ -114,6 +115,22 @@ const TemplateEditorPage = () => {
 
   const addCustomImage = () => {
     addImgInputRef.current?.click();
+  };
+
+  const addQrCode = () => {
+    const newEl: TemplateElement = {
+      id: `qr-${Date.now()}`,
+      type: "qrCode",
+      label: "QR Code",
+      x: 91,
+      y: 292,
+      width: 60,
+      height: 60,
+      visible: true,
+      borderRadius: 4,
+    };
+    setElements((prev) => [...prev, newEl]);
+    setSelectedId(newEl.id);
   };
 
   const handleAddImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,6 +331,9 @@ const TemplateEditorPage = () => {
             <div className="space-y-1.5">
               <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={addCustomText}>
                 <Plus className="w-3 h-3 mr-1.5" /> Custom Text
+              </Button>
+              <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={addQrCode}>
+                <QrCode className="w-3 h-3 mr-1.5" /> QR Code
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={addCustomImage}>
                 <Image className="w-3 h-3 mr-1.5" /> Custom Image

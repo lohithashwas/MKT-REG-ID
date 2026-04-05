@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
+import { QRCodeSVG } from "qrcode.react";
 import { TemplateElement } from "@/types/template";
 
 interface TemplatePreviewCardProps {
@@ -169,6 +170,33 @@ const TemplatePreviewCard = ({
             />
           </div>
         ) : null;
+      case "qrCode":
+        return (
+          <div
+            key={el.id}
+            style={{
+              position: "absolute",
+              left: `${el.x}px`,
+              top: `${el.y}px`,
+              width: `${el.width}px`,
+              height: `${el.height}px`,
+              padding: "4px",
+              backgroundColor: "#fff",
+              borderRadius: el.borderRadius ? `${el.borderRadius}px` : "2px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <QRCodeSVG 
+              value={data.id} 
+              size={Math.min(el.width, el.height) - 8}
+              level="H"
+              includeMargin={false}
+              style={{ width: "100%", height: "100%", display: "block" }}
+            />
+          </div>
+        );
       default:
         return null;
     }
