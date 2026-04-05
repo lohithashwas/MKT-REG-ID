@@ -151,12 +151,16 @@ const ScannerPage = () => {
           const reader = new BrowserMultiFormatReader(hints);
           readerRef.current = reader;
 
-          // Stable Mode: Let the browser and library handle device selection automatically.
-          await reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
-            if (result) {
-              fetchRegistration(result.getText());
+          // Use environment (rear) camera for reliable QR scanning on mobile.
+          await reader.decodeFromConstraints(
+            { video: { facingMode: { ideal: "environment" } } },
+            videoRef.current!,
+            (result, err) => {
+              if (result) {
+                fetchRegistration(result.getText());
+              }
             }
-          });
+          );
 
           setCameraReady(true);
         } catch (e) {
