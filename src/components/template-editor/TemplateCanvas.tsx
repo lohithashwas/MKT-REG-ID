@@ -7,6 +7,8 @@ interface TemplateCanvasProps {
   elements: TemplateElement[];
   backgroundColor: string;
   backgroundImage?: string;
+  cardWidth: number;
+  cardHeight: number;
   selectedId: string | null;
   scale: number;
   onSelect: (id: string | null) => void;
@@ -22,21 +24,12 @@ const SAMPLE_DATA = {
   photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=250&fit=crop&crop=face",
 };
 
-const TemplateCanvas = ({
-  elements,
-  backgroundColor,
-  backgroundImage,
-  selectedId,
-  scale,
-  onSelect,
-  onUpdateElement,
-}: TemplateCanvasProps) => {
-  const barcodeRef = useRef<SVGSVGElement>(null);
-
+const EditorBarcode = ({ value }: { value: string }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (barcodeRef.current) {
+    if (canvasRef.current && value) {
       try {
-        JsBarcode(barcodeRef.current, SAMPLE_DATA.id, {
+        JsBarcode(canvasRef.current, value, {
           format: "CODE128",
           width: 1.5,
           height: 35,
@@ -47,7 +40,21 @@ const TemplateCanvas = ({
         // ignore
       }
     }
-  }, [elements]);
+  }, [value]);
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />;
+};
+
+const TemplateCanvas = ({
+  elements,
+  backgroundColor,
+  backgroundImage,
+  cardWidth,
+  cardHeight,
+  selectedId,
+  scale,
+  onSelect,
+  onUpdateElement,
+}: TemplateCanvasProps) => {
 
   const renderElementContent = (el: TemplateElement) => {
     const textStyle: React.CSSProperties = {
@@ -104,7 +111,7 @@ const TemplateCanvas = ({
       case "idText":
         return <div style={textStyle}>{SAMPLE_DATA.id}</div>;
       case "barcode":
-        return <svg ref={barcodeRef} style={{ width: "100%", height: "100%" }} />;
+        return <EditorBarcode value={SAMPLE_DATA.id} />;
       case "customText":
         return <div style={textStyle}>{el.textContent || "Custom Text"}</div>;
       case "customImage":
@@ -145,14 +152,14 @@ const TemplateCanvas = ({
   return (
     <div
       style={{
-        width: `${CARD_WIDTH}px`,
-        height: `${CARD_HEIGHT}px`,
-        backgroundColor,
+        width: `${cardWidth}px`,
+        height: `${cardHeight}px`,
+        backgroundColor: backgroundImage ? "transparent" : backgroundColor,
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
         fontFamily: "'Space Grotesk', sans-serif",
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: "contain",
+        backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         transform: `scale(${scale})`,

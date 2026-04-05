@@ -36,6 +36,8 @@ const TemplateEditorPage = () => {
   const [elements, setElements] = useState<TemplateElement[]>(DEFAULT_ELEMENTS);
   const [backgroundColor, setBackgroundColor] = useState("#e8ecf1");
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>();
+  const [cardWidth, setCardWidth] = useState(CARD_WIDTH);
+  const [cardHeight, setCardHeight] = useState(CARD_HEIGHT);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [canvasScale] = useState(1.8);
@@ -57,6 +59,8 @@ const TemplateEditorPage = () => {
           setElements(config.elements);
           setBackgroundColor(config.backgroundColor);
           setBackgroundImage(config.background);
+          setCardWidth(config.cardWidth || CARD_WIDTH);
+          setCardHeight(config.cardHeight || CARD_HEIGHT);
           toast.success("Template loaded");
         }
       } catch {
@@ -142,6 +146,8 @@ const TemplateEditorPage = () => {
     setElements(layout.elements.map((el) => ({ ...el })));
     setBackgroundColor(layout.backgroundColor);
     setBackgroundImage(undefined);
+    setCardWidth(CARD_WIDTH);
+    setCardHeight(CARD_HEIGHT);
     setSelectedId(null);
     toast.success(`Applied "${layout.name}" layout`);
   };
@@ -150,7 +156,19 @@ const TemplateEditorPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setBackgroundImage(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setBackgroundImage(dataUrl);
+
+      // Adjust card dimensions to EXACTLY match the uploaded image aspect ratio
+      const img = new window.Image();
+      img.onload = () => {
+        const aspect = img.height / img.width;
+        setCardWidth(242);
+        setCardHeight(Math.round(242 * aspect));
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -158,16 +176,16 @@ const TemplateEditorPage = () => {
     setSaving(true);
     try {
       let bgToSave = backgroundImage;
-      if (bgToSave && bgToSave.length > 500000) {
-        bgToSave = await compressImage(bgToSave, 400, 600);
+      if (bgToSave && bgToSave.length > 3000000) { // Only compress if over ~3MB
+        bgToSave = await compressImage(bgToSave, 2000, 3000); // Preserve high resolution instead of 400x600
       }
       const config: TemplateConfig = {
         id: "main",
         name: templateName,
         background: bgToSave || "",
         backgroundColor,
-        cardWidth: CARD_WIDTH,
-        cardHeight: CARD_HEIGHT,
+        cardWidth,
+        cardHeight,
         elements,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -263,17 +281,28 @@ const TemplateEditorPage = () => {
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Background</h3>
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-8 h-8 rounded border border-input cursor-pointer" />
-                <Input value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="h-7 text-xs flex-1" />
-              </div>
+              {!backgroundImage && (
+                <div className="flex items-center gap-2">
+                  <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-8 h-8 rounded border border-input cursor-pointer" />
+                  <Input value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="h-7 text-xs flex-1" />
+                </div>
+              )}
+              {backgroundImage && (
+                <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  ✓ Background image set
+                </p>
+              )}
               <input type="file" ref={bgInputRef} accept="image/*" className="hidden" onChange={handleBgUpload} />
               <input type="file" ref={addImgInputRef} accept="image/*" className="hidden" onChange={handleAddImageFile} />
               <Button variant="outline" size="sm" className="w-full h-7 text-xs" onClick={() => bgInputRef.current?.click()}>
-                <Image className="w-3 h-3 mr-1" /> Upload Background
+                <Image className="w-3 h-3 mr-1" /> {backgroundImage ? "Replace Background" : "Upload Background"}
               </Button>
               {backgroundImage && (
-                <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-destructive" onClick={() => setBackgroundImage(undefined)}>
+                <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-destructive" onClick={() => {
+                  setBackgroundImage(undefined);
+                  setCardWidth(CARD_WIDTH);
+                  setCardHeight(CARD_HEIGHT);
+                }}>
                   Remove Background
                 </Button>
               )}
@@ -311,11 +340,13 @@ const TemplateEditorPage = () => {
         </div>
 
         <div className="flex-1 overflow-auto bg-muted/30 flex items-start justify-center p-8">
-          <div className="shadow-2xl" style={{ width: `${CARD_WIDTH * canvasScale}px`, height: `${CARD_HEIGHT * canvasScale}px` }}>
+          <div className="shadow-2xl" style={{ width: `${cardWidth * canvasScale}px`, height: `${cardHeight * canvasScale}px` }}>
             <TemplateCanvas
               elements={elements}
               backgroundColor={backgroundColor}
               backgroundImage={backgroundImage}
+              cardWidth={cardWidth}
+              cardHeight={cardHeight}
               selectedId={selectedId}
               scale={canvasScale}
               onSelect={setSelectedId}

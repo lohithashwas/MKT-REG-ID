@@ -24,8 +24,6 @@ interface Registration {
 }
 
 const CARDS_PER_ROW = 3;
-const CARDS_PER_COL = 4;
-const CARDS_PER_PAGE = CARDS_PER_ROW * CARDS_PER_COL;
 
 const A4_W = 210;
 const A4_H = 297;
@@ -115,6 +113,14 @@ const PrintPage = () => {
       setGenerating(false);
     }
   };
+
+  const cw = templateConfig?.cardWidth || CARD_WIDTH;
+  const ch = templateConfig?.cardHeight || CARD_HEIGHT;
+  const s = ((A4_W / CARDS_PER_ROW) * 3.7795) / cw; 
+  const realW_mm = A4_W / CARDS_PER_ROW; 
+  const realH_mm = (ch * s) / 3.7795;
+  const CARDS_PER_COL = Math.floor(A4_H / realH_mm);
+  const CARDS_PER_PAGE = CARDS_PER_ROW * CARDS_PER_COL;
 
   const pages: Registration[][] = [];
   for (let i = 0; i < registrations.length; i += CARDS_PER_PAGE) {
@@ -215,13 +221,6 @@ const PrintPage = () => {
 
           <div className="py-8 flex flex-col items-center gap-8 print-area" ref={printRef}>
             {pages.map((pageCards, pageIdx) => {
-              const cellW = A4_W / CARDS_PER_ROW;
-              const cellH = A4_H / CARDS_PER_COL;
-              const cw = templateConfig?.cardWidth || CARD_WIDTH;
-              const ch = templateConfig?.cardHeight || CARD_HEIGHT;
-              const cellWPx = cellW * 3.7795;
-              const cellHPx = cellH * 3.7795;
-              const s = Math.min(cellWPx / cw, cellHPx / ch);
               return (
                 <div
                   key={pageIdx}
@@ -230,17 +229,19 @@ const PrintPage = () => {
                     width: `${A4_W}mm`,
                     height: `${A4_H}mm`,
                     display: "grid",
-                    gridTemplateColumns: `repeat(${CARDS_PER_ROW}, ${cellW}mm)`,
-                    gridTemplateRows: `repeat(${CARDS_PER_COL}, ${cellH}mm)`,
+                    gridTemplateColumns: `repeat(${CARDS_PER_ROW}, ${realW_mm}mm)`,
+                    gridTemplateRows: `repeat(${CARDS_PER_COL}, ${realH_mm}mm)`,
+                    alignContent: "flex-start",
+                    justifyContent: "flex-start",
                     gap: 0,
-                    padding: 0,
                     margin: 0,
+                    padding: 0,
                     overflow: "hidden",
                     border: "none",
                   }}
                 >
                   {pageCards.map((r) => (
-                    <div key={r.id} style={{ width: `${cellW}mm`, height: `${cellH}mm`, overflow: "hidden", padding: 0, margin: 0, border: "none" }}>
+                    <div key={r.id} style={{ width: `${realW_mm}mm`, height: `${realH_mm}mm`, overflow: "hidden", padding: 0, margin: 0, border: "none" }}>
                       <div style={{ transform: `scale(${s})`, transformOrigin: "top left", width: `${cw}px`, height: `${ch}px` }}>
                         <TemplatePreviewCard
                           elements={templateConfig?.elements || DEFAULT_ELEMENTS}

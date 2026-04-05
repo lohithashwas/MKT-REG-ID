@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Download, Search, Users, Shield, ArrowLeft, Printer, Palette } from "lucide-react";
+import { Download, Search, Users, Shield, ArrowLeft, Printer, Palette, ScanLine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import * as XLSX from "xlsx";
@@ -122,6 +122,9 @@ const AdminPage = () => {
             </Button>
             <Button variant="outline" onClick={() => navigate("/print")}>
               <Printer className="w-4 h-4 mr-1" /> Print ID Cards
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/scanner")}>
+              <ScanLine className="w-4 h-4 mr-1" /> Scanner
             </Button>
             <Button onClick={downloadExcel} disabled={registrations.length === 0}>
               <Download className="w-4 h-4 mr-1" /> Download Excel

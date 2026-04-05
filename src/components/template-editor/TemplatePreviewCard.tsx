@@ -18,20 +18,12 @@ interface TemplatePreviewCardProps {
   };
 }
 
-const TemplatePreviewCard = ({
-  elements,
-  backgroundColor,
-  backgroundImage,
-  cardWidth,
-  cardHeight,
-  data,
-}: TemplatePreviewCardProps) => {
-  const barcodeRef = useRef<SVGSVGElement>(null);
-
+const PreviewBarcode = ({ value, style }: { value: string, style: React.CSSProperties }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (barcodeRef.current && data.id) {
+    if (canvasRef.current && value) {
       try {
-        JsBarcode(barcodeRef.current, data.id, {
+        JsBarcode(canvasRef.current, value, {
           format: "CODE128",
           width: 1.5,
           height: 35,
@@ -42,7 +34,18 @@ const TemplatePreviewCard = ({
         // ignore
       }
     }
-  }, [data.id]);
+  }, [value]);
+  return <canvas ref={canvasRef} style={style} />;
+};
+
+const TemplatePreviewCard = ({
+  elements,
+  backgroundColor,
+  backgroundImage,
+  cardWidth,
+  cardHeight,
+  data,
+}: TemplatePreviewCardProps) => {
 
   const renderElement = (el: TemplateElement) => {
     if (!el.visible) return null;
@@ -101,9 +104,9 @@ const TemplatePreviewCard = ({
       }
       case "barcode":
         return (
-          <svg
+          <PreviewBarcode
             key={el.id}
-            ref={barcodeRef}
+            value={data.id}
             style={{
               position: "absolute",
               left: `${el.x}px`,
@@ -178,10 +181,10 @@ const TemplatePreviewCard = ({
         height: `${cardHeight}px`,
         position: "relative",
         overflow: "hidden",
-        backgroundColor,
+        backgroundColor: backgroundImage ? "transparent" : backgroundColor,
         fontFamily: "'Space Grotesk', sans-serif",
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: "contain",
+        backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         pageBreakInside: "avoid",

@@ -8,6 +8,7 @@ import Index from "./pages/Index.tsx";
 import AdminPage from "./pages/AdminPage.tsx";
 import PrintPage from "./pages/PrintPage.tsx";
 import TemplateEditorPage from "./pages/TemplateEditorPage.tsx";
+import ScannerPage from "./pages/ScannerPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/print" element={<PrintPage />} />
             <Route path="/template-editor" element={<TemplateEditorPage />} />
+            <Route path="/scanner" element={<ScannerPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
