@@ -189,6 +189,7 @@ const ScannerPage = () => {
         } catch (e) {}
       }
 
+<<<<<<< HEAD
       // Method 2: jsQR Fallback (Instant JS detection)
       if (!detectedText) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -222,6 +223,18 @@ const ScannerPage = () => {
               focusMode: { ideal: "continuous" }
             }
           };
+=======
+          // Use environment (rear) camera for reliable QR scanning on mobile.
+          await reader.decodeFromConstraints(
+            { video: { facingMode: { ideal: "environment" } } },
+            videoRef.current!,
+            (result, err) => {
+              if (result) {
+                fetchRegistration(result.getText());
+              }
+            }
+          );
+>>>>>>> cfbf1ee4d545d38f2d18654a161731da01e2bdd4
 
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
           if (videoRef.current) {
