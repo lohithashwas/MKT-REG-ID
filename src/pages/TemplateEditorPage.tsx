@@ -1,9 +1,8 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ref, set, get } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import {
@@ -16,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import TemplateCanvas from "@/components/template-editor/TemplateCanvas";
 import ElementProperties from "@/components/template-editor/ElementProperties";
 import {
@@ -27,10 +27,8 @@ import {
   PREDEFINED_LAYOUTS,
 } from "@/types/template";
 
-const ADMIN_PIN = "admin2024";
-
 const TemplateEditorPage = () => {
-  const [authenticated, setAuthenticated] = useState(false);
+  const { authenticated, login } = useAdminAuth();
   const [pin, setPin] = useState("");
   const navigate = useNavigate();
 
@@ -41,34 +39,38 @@ const TemplateEditorPage = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [canvasScale] = useState(1.8);
+  const [templateLoaded, setTemplateLoaded] = useState(false);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const addImgInputRef = useRef<HTMLInputElement>(null);
 
   const selectedElement = elements.find((e) => e.id === selectedId) || null;
 
+  // Load template once authenticated
+  useEffect(() => {
+    if (!authenticated || templateLoaded) return;
+    const loadTemplate = async () => {
+      try {
+        const snap = await get(ref(database, "templateConfig"));
+        if (snap.exists()) {
+          const config = snap.val() as TemplateConfig;
+          setTemplateName(config.name);
+          setElements(config.elements);
+          setBackgroundColor(config.backgroundColor);
+          setBackgroundImage(config.background);
+          toast.success("Template loaded");
+        }
+      } catch {
+        // no saved template, use defaults
+      }
+      setTemplateLoaded(true);
+    };
+    loadTemplate();
+  }, [authenticated, templateLoaded]);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      setAuthenticated(true);
-      loadTemplate();
-    } else {
+    if (!login(pin)) {
       toast.error("Invalid PIN");
-    }
-  };
-
-  const loadTemplate = async () => {
-    try {
-      const snap = await get(ref(database, "templateConfig"));
-      if (snap.exists()) {
-        const config = snap.val() as TemplateConfig;
-        setTemplateName(config.name);
-        setElements(config.elements);
-        setBackgroundColor(config.backgroundColor);
-        setBackgroundImage(config.background);
-        toast.success("Template loaded");
-      }
-    } catch {
-      // no saved template, use defaults
     }
   };
 
@@ -155,10 +157,8 @@ const TemplateEditorPage = () => {
   const saveTemplate = async () => {
     setSaving(true);
     try {
-      // Don't store large base64 background images in Firebase (size limit)
       let bgToSave = backgroundImage;
       if (bgToSave && bgToSave.length > 500000) {
-        // Compress by drawing to a smaller canvas
         bgToSave = await compressImage(bgToSave, 400, 600);
       }
       const config: TemplateConfig = {
@@ -226,7 +226,6 @@ const TemplateEditorPage = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Toolbar */}
       <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
@@ -249,75 +248,32 @@ const TemplateEditorPage = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel - Layouts & Tools */}
         <div className="w-56 border-r border-border bg-card overflow-y-auto p-3 space-y-4">
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Predefined Layouts
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Predefined Layouts</h3>
             <div className="space-y-1.5">
               {PREDEFINED_LAYOUTS.map((layout, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start h-8 text-xs"
-                  onClick={() => applyLayout(i)}
-                >
-                  <LayoutTemplate className="w-3 h-3 mr-1.5" />
-                  {layout.name}
+                <Button key={i} variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={() => applyLayout(i)}>
+                  <LayoutTemplate className="w-3 h-3 mr-1.5" /> {layout.name}
                 </Button>
               ))}
             </div>
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Background
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Background</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="w-8 h-8 rounded border border-input cursor-pointer"
-                />
-                <Input
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="h-7 text-xs flex-1"
-                />
+                <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-8 h-8 rounded border border-input cursor-pointer" />
+                <Input value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="h-7 text-xs flex-1" />
               </div>
-              <input
-                type="file"
-                ref={bgInputRef}
-                accept="image/*"
-                className="hidden"
-                onChange={handleBgUpload}
-              />
-              <input
-                type="file"
-                ref={addImgInputRef}
-                accept="image/*"
-                className="hidden"
-                onChange={handleAddImageFile}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-7 text-xs"
-                onClick={() => bgInputRef.current?.click()}
-              >
+              <input type="file" ref={bgInputRef} accept="image/*" className="hidden" onChange={handleBgUpload} />
+              <input type="file" ref={addImgInputRef} accept="image/*" className="hidden" onChange={handleAddImageFile} />
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs" onClick={() => bgInputRef.current?.click()}>
                 <Image className="w-3 h-3 mr-1" /> Upload Background
               </Button>
               {backgroundImage && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full h-7 text-xs text-destructive"
-                  onClick={() => setBackgroundImage(undefined)}
-                >
+                <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-destructive" onClick={() => setBackgroundImage(undefined)}>
                   Remove Background
                 </Button>
               )}
@@ -325,41 +281,25 @@ const TemplateEditorPage = () => {
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Add Elements
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Add Elements</h3>
             <div className="space-y-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start h-8 text-xs"
-                onClick={addCustomText}
-              >
+              <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={addCustomText}>
                 <Plus className="w-3 h-3 mr-1.5" /> Custom Text
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start h-8 text-xs"
-                onClick={addCustomImage}
-              >
+              <Button variant="outline" size="sm" className="w-full justify-start h-8 text-xs" onClick={addCustomImage}>
                 <Image className="w-3 h-3 mr-1.5" /> Custom Image
               </Button>
             </div>
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Elements List
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Elements List</h3>
             <div className="space-y-1">
               {elements.map((el) => (
                 <button
                   key={el.id}
                   className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${
-                    selectedId === el.id
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:bg-muted"
+                    selectedId === el.id ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted"
                   } ${!el.visible ? "opacity-40 line-through" : ""}`}
                   onClick={() => setSelectedId(el.id)}
                 >
@@ -370,15 +310,8 @@ const TemplateEditorPage = () => {
           </div>
         </div>
 
-        {/* Center - Canvas */}
         <div className="flex-1 overflow-auto bg-muted/30 flex items-start justify-center p-8">
-          <div
-            className="shadow-2xl"
-            style={{
-              width: `${CARD_WIDTH * canvasScale}px`,
-              height: `${CARD_HEIGHT * canvasScale}px`,
-            }}
-          >
+          <div className="shadow-2xl" style={{ width: `${CARD_WIDTH * canvasScale}px`, height: `${CARD_HEIGHT * canvasScale}px` }}>
             <TemplateCanvas
               elements={elements}
               backgroundColor={backgroundColor}
@@ -391,25 +324,20 @@ const TemplateEditorPage = () => {
           </div>
         </div>
 
-        {/* Right panel - Properties */}
         <div className="w-60 border-l border-border bg-card overflow-y-auto p-3">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Properties
-          </h3>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Properties</h3>
           {selectedElement ? (
             <ElementProperties
               element={selectedElement}
               onUpdate={(updates) => updateElement(selectedElement.id, updates)}
               onDelete={
-                selectedElement.type === "customText"
+                selectedElement.type === "customText" || selectedElement.type === "customImage"
                   ? () => deleteElement(selectedElement.id)
                   : undefined
               }
             />
           ) : (
-            <p className="text-xs text-muted-foreground">
-              Click an element on the card to edit its properties.
-            </p>
+            <p className="text-xs text-muted-foreground">Click an element on the card to edit its properties.</p>
           )}
         </div>
       </div>
