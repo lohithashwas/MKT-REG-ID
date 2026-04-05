@@ -73,6 +73,8 @@ const ScannerPage = () => {
         const data = snap.val() as Omit<Registration, "id">;
         setScannedData({ id, ...data });
         toast.success(`Found: ${data.name}`);
+        // Add haptic feedback for "instant" scan confirmation
+        if (navigator.vibrate) navigator.vibrate(100);
       } else {
         setError("Registration not found for this barcode.");
         toast.error("Registration not found");
@@ -96,7 +98,12 @@ const ScannerPage = () => {
     setLastScannedId(null);
 
     try {
-      const reader = new BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.CODE_128,
+      ]);
+      const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
 
       const devices = await reader.listVideoInputDevices();
@@ -113,7 +120,7 @@ const ScannerPage = () => {
         return;
       }
 
-      reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
+      await reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
         if (result) {
           const text = result.getText();
           fetchRegistration(text);
@@ -242,6 +249,22 @@ const ScannerPage = () => {
               playsInline
               style={{ display: scanning ? "block" : "none" }}
             />
+            
+            {/* Scanning Box Guide for instant alignment */}
+            {scanning && !scannedData && (
+              <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+                <div className="w-56 h-56 border-2 border-primary/60 rounded-xl relative">
+                  {/* Focus corners */}
+                  <div className="absolute -top-1 -left-1 w-6 h-6 border-l-4 border-t-4 border-primary rounded-tl-lg" />
+                  <div className="absolute -top-1 -right-1 w-6 h-6 border-r-4 border-t-4 border-primary rounded-tr-lg" />
+                  <div className="absolute -bottom-1 -left-1 w-6 h-6 border-l-4 border-b-4 border-primary rounded-bl-lg" />
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 border-r-4 border-b-4 border-primary rounded-br-lg" />
+                  
+                  {/* Scanning Animation Line */}
+                  <div className="absolute inset-x-2 top-0 h-0.5 bg-primary/40 shadow-[0_0_10px_rgba(var(--primary),0.5)] animate-scan-line" />
+                </div>
+              </div>
+            )}
 
             {!scanning && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-3">
