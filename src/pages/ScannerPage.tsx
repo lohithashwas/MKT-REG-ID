@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ref, get } from "firebase/database";
+import { ref, get, update } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ import {
   X,
   Loader2,
   RefreshCw,
+  CalendarCheck2,
+  Utensils,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
@@ -32,6 +35,9 @@ interface Registration {
   track: string;
   photo: string;
   registeredAt: string;
+  actions?: {
+    [key: string]: boolean;
+  };
 }
 
 const ScannerPage = () => {
@@ -55,6 +61,35 @@ const ScannerPage = () => {
     setScanning(false);
     setCameraReady(false);
   }, []);
+
+  const toggleAction = async (actionKey: string) => {
+    if (!scannedData) return;
+    
+    const currentStatus = scannedData.actions?.[actionKey] || false;
+    const newStatus = !currentStatus;
+    
+    try {
+      await update(ref(database, `registrations/${scannedData.id}/actions`), {
+        [actionKey]: newStatus
+      });
+      
+      setScannedData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          actions: {
+            ...(prev.actions || {}),
+            [actionKey]: newStatus
+          }
+        };
+      });
+      
+      toast.success(`${actionKey.replace(/_/g, ' ').toUpperCase()} marked as ${newStatus ? 'SUCCESS' : 'REVERSED'}`);
+      if (navigator.vibrate) navigator.vibrate(50);
+    } catch (e) {
+      toast.error("Failed to update status");
+    }
+  };
 
   const fetchRegistration = useCallback(async (id: string) => {
     if (id === lastScannedId) return;
@@ -361,14 +396,73 @@ const ScannerPage = () => {
                   </div>
                 </div>
 
-                <div className="bg-muted/50 px-6 py-4 flex items-center justify-between border-t border-border/50">
-                  <div className="flex items-center gap-2 text-primary">
-                    <Tag className="w-4 h-4" />
-                    <span className="font-mono text-xs font-black tracking-tighter">{scannedData.id}</span>
+                <div className="bg-muted/50 px-6 py-4 flex flex-col gap-4 border-t border-border/50">
+                  {/* Attendance Section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CalendarCheck2 className="w-4 h-4 text-primary" />
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attendance</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => (
+                        <Button
+                          key={key}
+                          variant={scannedData.actions?.[key] ? "default" : "outline"}
+                          size="sm"
+                          className="h-8 text-[10px] font-bold px-3"
+                          onClick={() => toggleAction(key)}
+                        >
+                          {key.replace('_', ' ')}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
-                    {new Date(scannedData.registeredAt).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })}
+
+                  {/* Meals Section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Utensils className="w-4 h-4 text-primary" />
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Food Vouchers</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'day_1_lunch', label: 'D1 Lunch' },
+                        { id: 'day_1_dinner', label: 'D1 Dinner' },
+                        { id: 'day_2_breakfast', label: 'D2 B-Fast' },
+                        { id: 'day_2_lunch', label: 'D2 Lunch' }
+                      ].map((meal) => (
+                        <Button
+                          key={meal.id}
+                          variant={scannedData.actions?.[meal.id] ? "default" : "outline"}
+                          size="sm"
+                          className="h-9 text-[10px] font-bold justify-start px-3"
+                          onClick={() => toggleAction(meal.id)}
+                        >
+                          <div className={`w-2 h-2 rounded-full mr-2 ${scannedData.actions?.[meal.id] ? "bg-white" : "bg-primary/30"}`} />
+                          {meal.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Identification & Time */}
+                  <div className="pt-2 flex items-center justify-between opacity-60">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Tag className="w-4 h-4" />
+                      <span className="font-mono text-[10px] font-black tracking-tighter">{scannedData.id}</span>
+                    </div>
+                    <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+                      {new Date(scannedData.registeredAt).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+
+                  {/* Next Scan Action */}
+                  <Button 
+                    onClick={clearScan} 
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-black tracking-widest uppercase mt-2 shadow-lg shadow-primary/20 group"
+                  >
+                    NEXT SCAN <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
