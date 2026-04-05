@@ -152,6 +152,9 @@ const ScannerPage = () => {
     }
   }, [lastScannedId, loading, history]);
 
+  const onScanSuccessRef = useRef<((id: string) => void) | null>(null);
+  onScanSuccessRef.current = fetchRegistration;
+
   useEffect(() => {
     if (scanning && !scannerRef.current) {
         const initScanner = async () => {
@@ -165,7 +168,7 @@ const ScannerPage = () => {
                 }
                 
                 // Smart Discovery: Prioritize back/rear cameras
-                let backCameraId = cameras[cameras.length - 1].id; // Fallback to last
+                let backCameraId = cameras[cameras.length - 1].id;
                 const rearCamera = cameras.find(c => 
                     c.label.toLowerCase().includes('back') || 
                     c.label.toLowerCase().includes('rear') ||
@@ -176,14 +179,17 @@ const ScannerPage = () => {
                 await scanner.start(
                     backCameraId,
                     {
-                        fps: 10,
+                        fps: 20, // High-speed tracking
                         qrbox: { width: 250, height: 250 },
                         aspectRatio: 1.0,
                     },
                     (decodedText) => {
-                        fetchRegistration(decodedText);
+                        // USE THE REF: This prevents the scanner from restarting
+                        if (onScanSuccessRef.current) {
+                            onScanSuccessRef.current(decodedText);
+                        }
                     },
-                    undefined // ignore failure frames
+                    undefined
                 );
                 
                 setCameraReady(true);
@@ -201,11 +207,10 @@ const ScannerPage = () => {
     }
     
     return () => {
-        if (scannerRef.current && scannerRef.current.isScanning) {
-            scannerRef.current.stop().catch(() => {});
-        }
+        // ONLY stop if the scanning toggle is turned OFF manually
+        // We don't stop between individual scans anymore
     };
-  }, [scanning, fetchRegistration]);
+  }, [scanning]); // ONLY DEPEND ON SCANNING TOGGLE
 
   const startScanner = () => {
     setScanning(true);
