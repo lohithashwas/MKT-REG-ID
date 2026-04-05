@@ -80,10 +80,7 @@ const ScannerPage = () => {
 
   const toggleAction = async (actionKey: string) => {
     if (!scannedData) return;
-    if (scannedData.actions?.[actionKey]) {
-      toast.info("This record is already locked.");
-      return;
-    }
+    if (scannedData.actions?.[actionKey]) return; // Strictly locked
     
     try {
       await update(ref(database, `registrations/${scannedData.id}/actions`), {
@@ -101,10 +98,10 @@ const ScannerPage = () => {
         };
       });
       
-      toast.success("Record submitted and locked.");
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      toast.success("Locked Successfully");
+      if (navigator.vibrate) navigator.vibrate(50);
     } catch (e) {
-      toast.error("Submit failed");
+      toast.error("Operation failed");
     }
   };
 
@@ -118,18 +115,17 @@ const ScannerPage = () => {
       if (snap.exists()) {
         const data = snap.val() as Omit<Registration, "id">;
         setScannedData({ id, ...data });
-        toast.success(`Scanned: ${data.name}`);
+        toast.success(`Verified: ${data.name}`);
         if (navigator.vibrate) navigator.vibrate(100);
       } else {
-        setError("Invalid Code");
-        toast.error("Participant not found");
+        setError(`Not Found: ${id}`);
         setScannedData(null);
-        setTimeout(() => setLastScannedId(null), 1500);
+        setTimeout(() => setLastScannedId(null), 2000);
       }
     } catch {
-      setError("Sync Error");
+      setError("Database Offline");
       setScannedData(null);
-      setTimeout(() => setLastScannedId(null), 1500);
+      setTimeout(() => setLastScannedId(null), 2000);
     } finally {
       setLoading(false);
     }
@@ -151,40 +147,21 @@ const ScannerPage = () => {
             BarcodeFormat.CODE_128,
           ]);
           hints.set(DecodeHintType.TRY_HARDER, true);
+          
           const reader = new BrowserMultiFormatReader(hints);
           readerRef.current = reader;
 
-          const devices = await reader.listVideoInputDevices();
-          const backCamera = devices.find((d) =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("rear") ||
-            d.label.toLowerCase().includes("environment")
-          );
-          const deviceId = backCamera?.deviceId || (devices.length > 0 ? devices[0].deviceId : undefined);
-
-          if (devices.length === 0) {
-            setError("No Camera");
-            setScanning(false);
-            return;
-          }
-
-          console.log("Activating high-speed scanner engine...");
-
-          // Start the unified scanning engine - DO NOT call getUserMedia manually first
-          await reader.decodeFromVideoDevice(deviceId, videoRef.current!, (result, err) => {
+          // Stable Mode: Let the browser and library handle device selection automatically.
+          await reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
             if (result) {
               fetchRegistration(result.getText());
             }
-            if (err && !(err instanceof NotFoundException)) {
-              if (err.name !== 'NotFoundException') console.warn("Scan Loop:", err);
-            }
           });
 
-          // Wait a small moment to ensure the stream is established
-          setTimeout(() => setCameraReady(true), 500);
+          setCameraReady(true);
         } catch (e) {
           console.error(e);
-          setError("Lens Error");
+          setError("Permissions Denied");
           setScanning(false);
         }
       };
@@ -214,25 +191,21 @@ const ScannerPage = () => {
   if (!scannerAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="glass-card max-w-sm w-full shadow-2xl">
-          <CardContent className="pt-6">
-            <div className="text-center mb-6">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <ScanLine className="w-8 h-8 text-primary" />
-              </div>
-              <h2 className="font-display text-2xl font-bold mb-1">Verify Access</h2>
-              <p className="text-muted-foreground text-sm">Enter admin PIN to start scanning</p>
-            </div>
+        <Card className="max-w-sm w-full border-2 border-primary/20 shadow-2xl">
+          <CardContent className="pt-8">
+            <ScanLine className="w-16 h-16 text-primary mx-auto mb-6" />
+            <h2 className="text-xl font-bold text-center uppercase mb-6">Scanner Login</h2>
             <form onSubmit={handleLogin} className="space-y-4">
               <Input
                 type="password"
-                placeholder="Scanner PIN"
+                placeholder="PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 autoFocus
+                className="text-center text-2xl h-14 font-black"
               />
-              <Button type="submit" className="w-full h-11 font-semibold">
-                <Shield className="w-4 h-4 mr-2" /> Unlock Scanner
+              <Button type="submit" className="w-full h-14 font-bold uppercase text-lg">
+                Access Scanner
               </Button>
             </form>
           </CardContent>
@@ -243,116 +216,101 @@ const ScannerPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => { stopScanner(); navigate("/admin"); }}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Exit
-          </Button>
-          <div className="flex items-center gap-2 text-sm font-bold">
-            <div className={`w-2 h-2 rounded-full ${cameraReady ? 'bg-green-500 animate-pulse' : 'bg-muted'}`} />
-            <span>ID SCANNER v2.1</span>
-          </div>
+      <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={() => { stopScanner(); navigate("/admin"); }}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> EXIT
+        </Button>
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${cameraReady ? "bg-green-500 animate-pulse" : "bg-muted"}`} />
+          <span className="text-[11px] font-black uppercase tracking-widest">Scanner Ready</span>
         </div>
         <div className="flex gap-2">
           {scanning ? (
             <Button variant="destructive" size="sm" onClick={stopScanner}>
-              <CameraOff className="w-4 h-4 mr-1" /> Stop
+              <CameraOff className="w-4 h-4 mr-1" /> STOP
             </Button>
           ) : (
-            <Button size="sm" onClick={startScanner} className="bg-green-600 hover:bg-green-700">
-              <Camera className="w-4 h-4 mr-1" /> Start
+            <Button size="sm" onClick={startScanner}>
+              <Camera className="w-4 h-4 mr-1" /> START
             </Button>
           )}
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 grid md:grid-cols-2 gap-6 pb-24">
-        <div className="space-y-4">
-          <div className="relative rounded-[2rem] overflow-hidden bg-black aspect-square border-4 border-card shadow-2xl group">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              style={{ display: scanning ? "block" : "none" }}
-            />
-            
-            {scanning && !scannedData && (
-              <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-                <div className="w-64 h-64 border-2 border-primary/40 rounded-3xl relative overflow-hidden backdrop-blur-[1px]">
-                  <div className="absolute inset-x-4 top-0 h-1 bg-primary animate-scan-line shadow-[0_0_15px_hsl(var(--primary))]" />
-                </div>
+      <div className="max-w-md mx-auto p-4 space-y-6 pb-24">
+        {/* Scanner Viewport */}
+        <div className="relative rounded-[2rem] overflow-hidden bg-black aspect-square border-4 border-card shadow-xl">
+          <video
+            ref={videoRef}
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+            style={{ display: scanning ? "block" : "none" }}
+          />
+          
+          {scanning && !scannedData && (
+            <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+              <div className="w-64 h-64 border-2 border-primary/40 rounded-3xl relative overflow-hidden backdrop-blur-[1px]">
+                <div className="absolute inset-x-4 top-0 h-1 bg-primary animate-scan-line shadow-[0_0_15px_hsl(var(--primary))]" />
               </div>
-            )}
+            </div>
+          )}
 
-            {!scanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-4">
-                <Camera className="w-12 h-12 opacity-20" />
-                <p className="text-sm font-bold tracking-widest opacity-40 uppercase">Awaiting Start</p>
-              </div>
-            )}
+          {!scanning && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-4">
+              <Camera className="w-12 h-12 opacity-20" />
+              <p className="text-sm font-bold opacity-40 uppercase">Waiting to start</p>
+            </div>
+          )}
 
-            {scanning && !cameraReady && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md text-white gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="text-sm font-bold uppercase tracking-tighter">Arming Lens...</p>
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl p-4 text-sm font-bold animate-in fade-in slide-in-from-top">
-              <X className="w-5 h-5 shrink-0" /> <p>{error}</p>
+          {scanning && !cameraReady && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-xs font-bold uppercase tracking-widest">Activating Camera...</p>
             </div>
           )}
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Latest Data Snap</h3>
-            {scannedData && (
-              <Button variant="ghost" size="sm" onClick={clearScan} className="h-7 text-[10px] font-black hover:bg-primary/10">
-                <RefreshCw className="w-3 h-3 mr-1.5" /> RE-SCAN
-              </Button>
-            )}
+        {/* Error Notification */}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 flex items-center gap-3 text-destructive animate-in fade-in slide-in-from-top duration-300">
+            <X className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm font-bold uppercase flex-1">{error}</p>
+            <Button size="sm" variant="ghost" onClick={startScanner} className="text-destructive font-black">RETRY</Button>
           </div>
+        )}
 
+        {/* Final Scanning Card */}
+        <div className="space-y-4">
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-24 bg-card/50 border-2 border-dashed border-border rounded-[2.5rem]">
+            <div className="flex flex-col items-center justify-center gap-4 py-20 bg-muted/20 border-2 border-dashed border-border rounded-[2.5rem]">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">In Sync...</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Verifying...</p>
             </div>
           ) : scannedData ? (
-            <Card className="glass-card overflow-hidden border-2 border-primary/20 shadow-2xl animate-in slide-in-from-right duration-500 rounded-[2.5rem]">
+            <Card className="glass-card overflow-hidden border-2 border-primary/20 shadow-2xl animate-in zoom-in-95 duration-500 rounded-[2.5rem]">
               <CardContent className="p-0">
-                <div className={`px-6 py-3 text-[10px] font-black tracking-[0.25em] uppercase flex items-center gap-2 ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-600" : "bg-rose-600"} text-white`}>
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Checked-In
+                <div className={`px-6 py-3 text-[10px] font-black tracking-[0.2em] uppercase flex items-center gap-2 ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-600" : "bg-rose-600"} text-white`}>
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Verified Participant
                 </div>
 
                 <div className="p-6">
                   <div className="flex gap-5 items-start">
                     <div className="w-24 h-32 rounded-2xl overflow-hidden shadow-lg border-2 border-border flex-shrink-0">
-                      <img
-                        src={scannedData.photo}
-                        alt={scannedData.name}
-                        className="w-full h-full object-cover"
-                        crossOrigin="anonymous"
-                      />
+                      <img src={scannedData.photo} alt={scannedData.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                     </div>
                     <div className="flex-1 min-w-0 pt-1">
                       <div className="mb-4">
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 font-mono">Participant</p>
-                        <h4 className="font-display font-black text-xl text-foreground leading-tight uppercase break-words line-clamp-2">
-                          {scannedData.name}
-                        </h4>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Name</p>
+                        <h4 className="font-display font-black text-xl text-foreground leading-tight uppercase break-words line-clamp-2">{scannedData.name}</h4>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="min-w-0">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5 font-mono">Team</p>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Team</p>
                           <p className="font-bold text-xs text-foreground truncate">{scannedData.teamName}</p>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5 font-mono">Category</p>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Category</p>
                           <p className="font-bold text-xs text-foreground truncate">{scannedData.track}</p>
                         </div>
                       </div>
@@ -362,32 +320,26 @@ const ScannerPage = () => {
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="w-full h-9 text-[10px] font-bold uppercase tracking-widest border-dashed hover:bg-primary/5">
-                          <Info className="w-3.5 h-3.5 mr-2" /> View All Details
+                        <Button variant="outline" size="sm" className="w-full h-10 text-[10px] font-bold uppercase tracking-widest rounded-xl">
+                          <Info className="w-3.5 h-3.5 mr-2" /> View Full Info
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-sm rounded-[2rem]">
                         <DialogHeader>
-                          <DialogTitle className="text-xl font-black uppercase tracking-tight">Full Record</DialogTitle>
+                          <DialogTitle className="text-xl font-bold uppercase">Participant Registry</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4 pt-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">ID</p>
-                              <p className="text-sm font-mono font-bold text-primary">{scannedData.id}</p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Entry</p>
-                              <p className="text-sm font-bold">{scannedData.track}</p>
-                            </div>
+                        <div className="space-y-4 pt-4 text-sm font-medium">
+                          <div className="flex justify-between border-b pb-2">
+                            <span className="text-muted-foreground uppercase text-[10px] font-black">ID</span>
+                            <span className="font-mono font-bold text-primary">{scannedData.id}</span>
                           </div>
-                          <div>
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Organization</p>
-                            <p className="text-sm font-bold leading-tight">{scannedData.collegeName}</p>
+                          <div className="flex justify-between border-b pb-2">
+                            <span className="text-muted-foreground uppercase text-[10px] font-black">Org</span>
+                            <span>{scannedData.collegeName}</span>
                           </div>
-                          <div>
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Timestamp</p>
-                            <p className="text-sm font-bold">{new Date(scannedData.registeredAt).toLocaleString()}</p>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground uppercase text-[10px] font-black">Join Date</span>
+                            <span>{new Date(scannedData.registeredAt).toLocaleDateString()}</span>
                           </div>
                         </div>
                       </DialogContent>
@@ -395,12 +347,10 @@ const ScannerPage = () => {
                   </div>
                 </div>
 
-                <div className="bg-muted/30 px-6 py-5 flex flex-col gap-5 border-t border-border/50">
-                  <div>
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                      <CalendarCheck2 className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] font-mono">Attendance Log</span>
-                    </div>
+                <div className="bg-muted/30 px-6 py-6 flex flex-col gap-6 border-t border-border/50">
+                  {/* Attendance */}
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Mark Attendance</span>
                     <div className="flex flex-wrap gap-2">
                       {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => {
                         const isLocked = scannedData.actions?.[key] || false;
@@ -410,29 +360,25 @@ const ScannerPage = () => {
                             variant={isLocked ? "default" : "outline"}
                             size="sm"
                             disabled={isLocked}
-                            className={`h-8 text-[9px] font-black px-3 transition-all duration-300 ${isLocked ? 'bg-green-600 hover:bg-green-600 opacity-100 cursor-default ring-2 ring-green-600/20' : ''}`}
+                            className={`h-9 px-4 rounded-xl font-bold ${isLocked ? 'bg-green-600 opacity-100 ring-2 ring-green-600/20' : ''}`}
                             onClick={() => toggleAction(key)}
                           >
-                            {isLocked ? <Lock className="w-2.5 h-2.5 mr-1.5" /> : null}
-                            {key.replace('_', ' ')}
-                            {isLocked ? <span className="ml-1 opacity-60">LOCKED</span> : null}
+                            {isLocked ? <Lock className="w-3 h-3 mr-1.5" /> : null} {key.replace('_', ' ')}
                           </Button>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                      <Utensils className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] font-mono">Meal Voucher</span>
-                    </div>
+                  {/* Meals */}
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Meal Tracking</span>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: 'day_1_lunch', label: 'D1 Lunch' },
                         { id: 'day_1_dinner', label: 'D1 Dinner' },
                         { id: 'day_2_breakfast', label: 'D2 B-Fast' },
-                        { id: 'day_2_lunch', label: 'D1 Lunch' }
+                        { id: 'day_2_lunch', label: 'D2 Lunch' }
                       ].map((meal) => {
                         const isLocked = scannedData.actions?.[meal.id] || false;
                         return (
@@ -441,12 +387,11 @@ const ScannerPage = () => {
                             variant={isLocked ? "default" : "outline"}
                             size="sm"
                             disabled={isLocked}
-                            className={`h-9 text-[9px] font-black justify-start px-3 transition-all duration-300 ${isLocked ? 'bg-blue-600 hover:bg-blue-600 opacity-100 cursor-default ring-2 ring-blue-600/20' : ''}`}
+                            className={`h-10 justify-start px-4 rounded-xl font-bold ${isLocked ? 'bg-blue-600 opacity-100 ring-2 ring-blue-600/20' : ''}`}
                             onClick={() => toggleAction(meal.id)}
                           >
-                            <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isLocked ? "bg-white animate-pulse" : "bg-primary/40"}`} />
-                            {meal.label}
-                            {isLocked && <Lock className="ml-auto w-2.5 h-2.5 opacity-50" />}
+                            <div className={`w-2 h-2 rounded-full mr-3 ${isLocked ? "bg-white animate-pulse" : "bg-primary/40"}`} />
+                            {meal.label} {isLocked && <Lock className="ml-auto w-3 h-3 opacity-50" />}
                           </Button>
                         );
                       })}
@@ -455,23 +400,20 @@ const ScannerPage = () => {
 
                   <Button 
                     onClick={clearScan} 
-                    className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black tracking-[0.2em] uppercase mt-2 shadow-xl shadow-primary/25 group relative"
+                    className="w-full h-14 bg-primary text-white font-black uppercase tracking-widest mt-2 shadow-2xl rounded-2xl group"
                   >
-                    READY NEXT SCAN
-                    <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    READY FOR NEXT SCAN <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-7 py-24 bg-card/40 border-2 border-dashed border-border rounded-[3rem] text-center px-10 group overflow-hidden">
-              <div className="w-24 h-24 rounded-[2rem] bg-background flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-700 relative z-10">
-                <ScanLine className="w-10 h-10 text-primary opacity-30 animate-pulse" />
-              </div>
-              <div className="relative z-10">
-                <p className="text-sm font-black tracking-[0.2em] text-foreground uppercase mb-2">Scanner Armed</p>
-                <p className="text-[11px] text-muted-foreground max-w-[220px] mx-auto leading-relaxed">
-                  System is active and ready. Align badge for instant retrieval.
+            <div className="flex flex-col items-center justify-center gap-7 py-20 bg-card/50 border-2 border-dashed border-border rounded-[3rem] text-center px-10 group">
+              <ScanLine className="w-12 h-12 text-primary opacity-20 animate-pulse" />
+              <div>
+                <p className="text-xs font-black tracking-[0.2em] text-foreground uppercase mb-2">SYSTEM ARMED</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[200px] mx-auto">
+                  Align the participant QR code firmly within the center guides.
                 </p>
               </div>
             </div>
