@@ -168,41 +168,64 @@ const ScannerPage = () => {
                 ) || cameras[0];
                 backCameraId = rearCamera.id;
                 
-                // Advanced Native Intelligence Constraints: Full HD & Continuous Focus
+                // Advanced 'Super-Zoom' Constraints for Small QRs
                 await scanner.start(
                     backCameraId,
                     {
                         fps: 30, 
-                        qrbox: { width: 300, height: 300 }, // Full-frame scan for small QRs
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            // High-Density Scan Region
+                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                            const qrboxSize = Math.floor(minEdge * 0.85); // 85% of screen
+                            return { width: qrboxSize, height: qrboxSize };
+                        },
                         aspectRatio: 1.0,
                         videoConstraints: {
-                           width: { ideal: 1920 },
-                           height: { ideal: 1080 },
                            facingMode: "environment",
-                           focusMode: "continuous",
+                           width: { ideal: 1280 },
+                           height: { ideal: 720 },
                            // @ts-ignore
-                           whiteBalanceMode: "continuous"
+                           focusMode: "continuous"
                         }
                     },
-                    () => {}, // fallback ignored for native loop
+                    (decodedText) => {
+                        // ENGINE 1: Standard Software (Stable Fallback)
+                        if (onScanSuccessRef.current) {
+                            onScanSuccessRef.current(decodedText);
+                        }
+                    },
                     undefined
                 );
                 
-                // START NATIVE HARDWARE LOOP (Built-in Camera Tech)
+                // ENGINE 2: Native Hardware (High-Speed ML)
                 const video = document.querySelector('#reader video') as HTMLVideoElement;
-                if (video && 'BarcodeDetector' in window) {
-                   const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-                   const scanFrame = async () => {
-                      if (!scannerRef.current?.isScanning) return;
-                      try {
-                         const results = await detector.detect(video);
-                         if (results.length > 0 && onScanSuccessRef.current) {
-                            onScanSuccessRef.current(results[0].rawValue);
+                if (video) {
+                   // Apply Digital Enhancement if possible
+                   try {
+                      // @ts-ignore
+                      const tracks = video.srcObject?.getVideoTracks();
+                      if (tracks && tracks[0]) {
+                         const capabilities = tracks[0].getCapabilities();
+                         if (capabilities.zoom) {
+                            tracks[0].applyConstraints({ advanced: [{ zoom: 2.0 }] });
                          }
-                      } catch (e) {}
-                      nativeLoopRef.current = requestAnimationFrame(scanFrame);
-                   };
-                   scanFrame();
+                      }
+                   } catch (e) {}
+
+                   if ('BarcodeDetector' in window) {
+                      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+                      const scanFrame = async () => {
+                         if (!scannerRef.current?.isScanning) return;
+                         try {
+                            const results = await detector.detect(video);
+                            if (results.length > 0 && onScanSuccessRef.current) {
+                               onScanSuccessRef.current(results[0].rawValue);
+                            }
+                         } catch (e) {}
+                         nativeLoopRef.current = requestAnimationFrame(scanFrame);
+                      };
+                      scanFrame();
+                   }
                 }
                 
                 setCameraReady(true);
