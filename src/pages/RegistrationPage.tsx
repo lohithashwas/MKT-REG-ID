@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ref, push } from "firebase/database";
+import { ref, set } from "firebase/database";
 import { database } from "@/lib/firebase";
 import PhotoCapture from "@/components/PhotoCapture";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,10 @@ const RegistrationPage = () => {
 
     setLoading(true);
     try {
-      const registrationsRef = ref(database, "registrations");
-      await push(registrationsRef, {
+      const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const registrationsRef = ref(database, `registrations/${shortId}`);
+      
+      await set(registrationsRef, {
         name: name.trim(),
         teamName: teamName.trim(),
         collegeName: collegeName.trim(),
