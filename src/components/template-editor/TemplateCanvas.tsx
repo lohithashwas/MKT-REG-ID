@@ -34,7 +34,8 @@ const EditorBarcode = ({ value }: { value: string }) => {
           width: 1.5,
           height: 35,
           displayValue: false,
-          margin: 0,
+          margin: 10,
+          background: "#ffffff",
         });
       } catch {
         // ignore

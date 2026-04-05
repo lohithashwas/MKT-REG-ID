@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
+import { BrowserMultiFormatReader, NotFoundException, BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 interface Registration {
   id: string;
@@ -95,7 +95,9 @@ const ScannerPage = () => {
     setLastScannedId(null);
 
     try {
-      const reader = new BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.CODE_128]);
+      const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
 
       // listVideoInputDevices is an instance method in @zxing/library

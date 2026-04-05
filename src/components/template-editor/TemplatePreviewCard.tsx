@@ -28,7 +28,8 @@ const PreviewBarcode = ({ value, style }: { value: string, style: React.CSSPrope
           width: 1.5,
           height: 35,
           displayValue: false,
-          margin: 0,
+          margin: 10,
+          background: "#ffffff",
         });
       } catch {
         // ignore
