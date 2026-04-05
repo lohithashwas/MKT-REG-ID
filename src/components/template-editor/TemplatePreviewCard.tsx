@@ -74,7 +74,8 @@ const TemplatePreviewCard = ({
     };
 
     switch (el.type) {
-      case "photo":
+      case "photo": {
+        const isCircle = el.photoShape === "circle";
         return (
           <div
             key={el.id}
@@ -85,7 +86,7 @@ const TemplatePreviewCard = ({
               width: `${el.width}px`,
               height: `${el.height}px`,
               overflow: "hidden",
-              borderRadius: el.borderRadius ? `${el.borderRadius}px` : undefined,
+              borderRadius: isCircle ? "50%" : el.borderRadius ? `${el.borderRadius}px` : undefined,
               border: "2px solid #2d3748",
             }}
           >
@@ -97,6 +98,7 @@ const TemplatePreviewCard = ({
             />
           </div>
         );
+      }
       case "barcode":
         return (
           <svg
@@ -179,7 +181,8 @@ const TemplatePreviewCard = ({
         backgroundColor,
         fontFamily: "'Space Grotesk', sans-serif",
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: "cover",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         pageBreakInside: "avoid",
       }}

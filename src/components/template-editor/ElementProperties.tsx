@@ -224,6 +224,20 @@ const ElementProperties = ({ element, onUpdate, onDelete }: ElementPropertiesPro
         </>
       )}
 
+      {element.type === "photo" && (
+        <div>
+          <Label className="text-xs text-muted-foreground">Photo Shape</Label>
+          <select
+            value={element.photoShape || "square"}
+            onChange={(e) => onUpdate({ photoShape: e.target.value as "square" | "circle" })}
+            className="w-full h-7 text-xs border border-input rounded-md px-2 bg-background"
+          >
+            <option value="square">Square</option>
+            <option value="circle">Circle</option>
+          </select>
+        </div>
+      )}
+
       <div>
         <Label className="text-xs text-muted-foreground">Border Radius</Label>
         <Input
