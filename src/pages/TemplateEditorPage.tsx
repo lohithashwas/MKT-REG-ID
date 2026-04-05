@@ -57,7 +57,32 @@ const TemplateEditorPage = () => {
         if (snap.exists()) {
           const config = snap.val() as TemplateConfig;
           setTemplateName(config.name);
-          setElements(config.elements);
+          
+          // Auto-migrate: If the template has a barcode but NO qrCode, replace it
+          let loadedElements = config.elements;
+          const hasBarcode = loadedElements.some(el => el.type === "barcode");
+          const hasQRCode = loadedElements.some(el => el.type === "qrCode");
+          
+          if (hasBarcode && !hasQRCode) {
+            loadedElements = loadedElements.map(el => {
+              if (el.type === "barcode") {
+                return {
+                  ...el,
+                  id: "qrCode",
+                  type: "qrCode" as const,
+                  label: "QR Code",
+                  width: 60,
+                  height: 60,
+                  x: Math.max(0, el.x + (el.width / 2) - 30), // Center based on old barcode
+                  y: el.y,
+                };
+              }
+              return el;
+            });
+            toast.info("Upgraded to high-speed QR Code!");
+          }
+
+          setElements(loadedElements);
           setBackgroundColor(config.backgroundColor);
           setBackgroundImage(config.background);
           setCardWidth(config.cardWidth || CARD_WIDTH);
