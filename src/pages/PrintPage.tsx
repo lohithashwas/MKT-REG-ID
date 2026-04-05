@@ -95,14 +95,14 @@ const PrintPage = () => {
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i] as HTMLElement;
         const canvas = await html2canvas(page, {
-          scale: 3,
+          scale: 5,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
         });
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const imgData = canvas.toDataURL("image/png");
         if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, 0, A4_W, A4_H);
+        pdf.addImage(imgData, "PNG", 0, 0, A4_W, A4_H);
       }
       pdf.save("id-cards.pdf");
       toast.success("PDF downloaded!");
