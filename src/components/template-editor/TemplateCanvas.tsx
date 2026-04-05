@@ -151,9 +151,10 @@ const TemplateCanvas = ({
           <div style={{ width: "100%", height: "100%", padding: "4px", backgroundColor: "#fff", borderRadius: el.borderRadius ? `${el.borderRadius}px` : "2px" }}>
             <QRCodeSVG 
               value={SAMPLE_DATA.id} 
-              size={Math.min(el.width, el.height) - 8}
+              size={Math.min(el.width, el.height) - 16}
               level="L"
-              includeMargin={false}
+              includeMargin={true}
+              marginSize={2}
               style={{ width: "100%", height: "100%", display: "block" }}
             />
           </div>
