@@ -25,7 +25,7 @@ const PreviewBarcode = ({ value, style }: { value: string, style: React.CSSPrope
       try {
         JsBarcode(canvasRef.current, value, {
           format: "CODE128",
-          width: 1.5,
+          width: 2,
           height: 35,
           displayValue: false,
           margin: 10,

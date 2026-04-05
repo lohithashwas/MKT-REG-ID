@@ -29,7 +29,7 @@ const RegistrationPage = () => {
 
     setLoading(true);
     try {
-      const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
       const registrationsRef = ref(database, `registrations/${shortId}`);
       
       await set(registrationsRef, {
