@@ -179,7 +179,8 @@ const TemplatePreviewCard = ({
         backgroundColor,
         fontFamily: "'Space Grotesk', sans-serif",
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: "cover",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
         pageBreakInside: "avoid",
       }}
