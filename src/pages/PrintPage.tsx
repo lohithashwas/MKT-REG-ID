@@ -91,18 +91,18 @@ const PrintPage = () => {
     setGenerating(true);
     try {
       const pages = printRef.current.querySelectorAll(".a4-page");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i] as HTMLElement;
         const canvas = await html2canvas(page, {
-          scale: 5,
+          scale: 4,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
         });
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
         if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, 0, A4_W, A4_H);
+        pdf.addImage(imgData, "JPEG", 0, 0, A4_W, A4_H, undefined, "FAST");
       }
       pdf.save("id-cards.pdf");
       toast.success("PDF downloaded!");
