@@ -267,8 +267,8 @@ const ScannerPage = () => {
       </div>
 
       <div className="max-w-xl mx-auto p-4 space-y-6 pb-32">
-        {/* Pro Camera Lens Container */}
-        <div className="relative rounded-[3rem] overflow-hidden bg-black aspect-square border-[8px] border-white/5 shadow-2xl ring-1 ring-white/10">
+        {/* Pro Camera Lens Container - ALWAYS IN DOM to prevent driver crash */}
+        <div className={`relative rounded-[3rem] overflow-hidden bg-black aspect-square border-[8px] border-white/5 shadow-2xl ring-1 ring-white/10 ${scannedData ? 'hidden' : 'block'}`}>
           <div id="reader" className="w-full h-full object-cover" />
           
           {scanning && !scannedData && !error && (
@@ -282,7 +282,7 @@ const ScannerPage = () => {
           {scanning && !cameraReady && !error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c0f] gap-6 z-20">
               <Loader2 className="w-14 h-14 animate-spin text-primary" />
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Discovery Phase...</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 text-center">Opening Iris...</p>
             </div>
           )}
           
