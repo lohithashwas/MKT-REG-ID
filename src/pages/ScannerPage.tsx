@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Html5Qrcode } from "html5-qrcode";
+import QrScanner from "qr-scanner"; // Nimiq Engine
 import {
   Dialog,
   DialogContent,
@@ -63,7 +63,8 @@ const ScannerPage = () => {
   const [status, setStatus] = useState<"READY" | "ACTIVE" | "SUCCESS" | "ERROR">("READY");
   const [history, setHistory] = useState<{id: string, name: string, time: number}[]>([]);
   
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerInstanceRef = useRef<QrScanner | null>(null);
   const navigate = useNavigate();
 
   const clearScan = useCallback(() => {
@@ -87,15 +88,9 @@ const ScannerPage = () => {
   };
 
   const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-        if (scannerRef.current.isScanning) {
-            try {
-                await scannerRef.current.stop();
-            } catch (e) {
-                console.warn("Stop warning:", e);
-            }
-        }
-        scannerRef.current = null;
+    if (scannerInstanceRef.current) {
+        scannerInstanceRef.current.destroy();
+        scannerInstanceRef.current = null;
     }
     setScanning(false);
     setCameraReady(false);
@@ -145,110 +140,66 @@ const ScannerPage = () => {
   const onScanSuccessRef = useRef<((id: string) => void) | null>(null);
   onScanSuccessRef.current = fetchRegistration;
 
-  const nativeLoopRef = useRef<number | null>(null);
-
   useEffect(() => {
-    if (scanning && !scannerRef.current) {
+    if (scanning && videoRef.current && !scannerInstanceRef.current) {
         const initScanner = async () => {
             try {
-                const scanner = new Html5Qrcode("reader");
-                scannerRef.current = scanner;
-                
-                const cameras = await Html5Qrcode.getCameras();
-                if (!cameras || cameras.length === 0) {
-                    throw new Error("No camera hardware found");
-                }
-                
-                // Smart Discovery: Prioritize back/rear cameras
-                let backCameraId = cameras[cameras.length - 1].id;
-                const rearCamera = cameras.find(c => 
-                    c.label.toLowerCase().includes('back') || 
-                    c.label.toLowerCase().includes('rear') ||
-                    c.label.toLowerCase().includes('environment')
-                ) || cameras[0];
-                backCameraId = rearCamera.id;
-                
-                // Advanced 'Super-Zoom' Constraints for Small QRs
-                await scanner.start(
-                    backCameraId,
+                // NIMIQ NATIVE CONSTRAINTS (Non-Negotiable for Small QR)
+                const scanner = new QrScanner(
+                    videoRef.current!,
+                    (result) => {
+                        if (onScanSuccessRef.current) {
+                            onScanSuccessRef.current(result.data);
+                        }
+                    },
                     {
-                        fps: 30, 
-                        qrbox: (viewfinderWidth, viewfinderHeight) => {
-                            // High-Density Scan Region
-                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                            const qrboxSize = Math.floor(minEdge * 0.85); // 85% of screen
-                            return { width: qrboxSize, height: qrboxSize };
+                        preferredCamera: 'environment', // Primary lens
+                        maxScansPerSecond: 30, // Hardware-accelerated ML fluidity
+                        highlightScanRegion: true,
+                        highlightCodeOutline: true,
+                        calculateScanRegion: (v) => {
+                           // High-Density Scan Region: Focus on the center
+                           const s = Math.min(v.videoWidth, v.videoHeight) * 0.85;
+                           return {
+                              x: (v.videoWidth - s) / 2,
+                              y: (v.videoHeight - s) / 2,
+                              width: s,
+                              height: s
+                           };
                         },
-                        aspectRatio: 1.0,
+                        // CRITICAL: Precise Hardware Handshake
+                        // @ts-ignore - QrScanner internal structure
                         videoConstraints: {
                            facingMode: "environment",
                            width: { ideal: 1280 },
                            height: { ideal: 720 },
-                           // @ts-ignore
-                           focusMode: "continuous"
+                           frameRate: { ideal: 30 },
+                           // @ts-ignore - Hardware specific features for small QRs
+                           focusMode: "continuous",
+                           zoom: 1.0 // Force 1X, avoid wide-angle gap
                         }
-                    },
-                    (decodedText) => {
-                        // ENGINE 1: Standard Software (Stable Fallback)
-                        if (onScanSuccessRef.current) {
-                            onScanSuccessRef.current(decodedText);
-                        }
-                    },
-                    undefined
+                    }
                 );
                 
-                // ENGINE 2: Native Hardware (High-Speed ML)
-                const video = document.querySelector('#reader video') as HTMLVideoElement;
-                if (video) {
-                   // Apply Digital Enhancement if possible
-                   try {
-                      // @ts-ignore
-                      const tracks = video.srcObject?.getVideoTracks();
-                      if (tracks && tracks[0]) {
-                         const capabilities = tracks[0].getCapabilities();
-                         if (capabilities.zoom) {
-                            tracks[0].applyConstraints({ advanced: [{ zoom: 2.0 }] });
-                         }
-                      }
-                   } catch (e) {}
-
-                   if ('BarcodeDetector' in window) {
-                      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-                      const scanFrame = async () => {
-                         if (!scannerRef.current?.isScanning) return;
-                         try {
-                            const results = await detector.detect(video);
-                            if (results.length > 0 && onScanSuccessRef.current) {
-                               onScanSuccessRef.current(results[0].rawValue);
-                            }
-                         } catch (e) {}
-                         nativeLoopRef.current = requestAnimationFrame(scanFrame);
-                      };
-                      scanFrame();
-                   }
-                }
-                
+                scannerInstanceRef.current = scanner;
+                await scanner.start();
                 setCameraReady(true);
                 setStatus("ACTIVE");
             } catch (err: any) {
                 console.error("Scanner Error:", err);
-                setError(`NATIVE BLOCK: ${err.message || 'Access Denied'}`);
+                setError(`LENS ERROR: ${err.message || 'Busy'}`);
                 setScanning(false);
                 setStatus("ERROR");
-                toast.error("Lens failed. Check permissions.");
-                scannerRef.current = null;
+                toast.error("Camera failed. Check hardware.");
             }
         };
         initScanner();
     }
     
     return () => {
-        if (nativeLoopRef.current) cancelAnimationFrame(nativeLoopRef.current);
-        if (scannerRef.current) {
-            if (scannerRef.current.isScanning) {
-                scannerRef.current.stop().catch(() => {});
-            }
-            scannerRef.current = null;
+        if (scannerInstanceRef.current) {
+            scannerInstanceRef.current.destroy();
+            scannerInstanceRef.current = null;
         }
     };
   }, [scanning]);
@@ -315,7 +266,7 @@ const ScannerPage = () => {
       <div className="max-w-xl mx-auto p-4 space-y-6 pb-32">
         {/* Pro Camera Lens Container - ALWAYS IN DOM to prevent driver crash */}
         <div className={`relative rounded-[3rem] overflow-hidden bg-black aspect-square border-[8px] border-white/5 shadow-2xl ring-1 ring-white/10 ${scannedData ? 'hidden' : 'block'}`}>
-          <div id="reader" className="w-full h-full object-cover" />
+          <video ref={videoRef} className="w-full h-full object-cover" />
           
           {scanning && !scannedData && !error && (
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
@@ -329,8 +280,8 @@ const ScannerPage = () => {
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c0f] gap-6 z-20 text-center p-8">
               <Loader2 className="w-14 h-14 animate-spin text-primary" />
               <div className="space-y-1">
-                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Native Intelligence Active</p>
-                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/10 italic">Initializing Full HD Lens...</p>
+                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Nimiq Native Engine</p>
+                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/10 italic">Strict Hardware Handshake...</p>
               </div>
             </div>
           )}
@@ -464,8 +415,8 @@ const ScannerPage = () => {
                  <ScanLine className="w-20 h-20 text-primary opacity-40 animate-pulse relative" />
               </div>
               <div className="space-y-4">
-                <p className="text-base font-black tracking-[0.4em] text-white uppercase italic drop-shadow-glow">Terminal Armed</p>
-                <p className="text-[12px] text-white/20 tracking-[0.25em] leading-relaxed max-w-[240px] mx-auto uppercase">Native Hardware Active</p>
+                <p className="text-base font-black tracking-[0.4em] text-white uppercase italic drop-shadow-glow">Nimiq Terminal Armed</p>
+                <p className="text-[12px] text-white/20 tracking-[0.25em] leading-relaxed max-w-[240px] mx-auto uppercase italic">Native Hardware ML Active</p>
               </div>
             </div>
           )}
