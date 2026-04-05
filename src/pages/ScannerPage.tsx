@@ -116,7 +116,15 @@ const ScannerPage = () => {
         return;
       }
 
-      reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
+      const constraints = {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        } as any
+      };
+
+      reader.decodeFromConstraints(constraints, videoRef.current!, (result, err) => {
         if (result) {
           const text = result.getText();
           fetchRegistration(text);
