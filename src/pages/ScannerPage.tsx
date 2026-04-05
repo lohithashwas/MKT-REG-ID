@@ -151,8 +151,14 @@ const ScannerPage = () => {
                     throw new Error("No camera hardware found");
                 }
                 
-                // Pick the back camera (usually last in the list)
-                const backCameraId = cameras[cameras.length - 1].id;
+                // Smart Discovery: Prioritize back/rear cameras
+                let backCameraId = cameras[cameras.length - 1].id; // Fallback to last
+                const rearCamera = cameras.find(c => 
+                    c.label.toLowerCase().includes('back') || 
+                    c.label.toLowerCase().includes('rear') ||
+                    c.label.toLowerCase().includes('environment')
+                );
+                if (rearCamera) backCameraId = rearCamera.id;
                 
                 await scanner.start(
                     backCameraId,
@@ -250,7 +256,7 @@ const ScannerPage = () => {
       <div className="max-w-xl mx-auto p-4 space-y-6 pb-32">
         {/* Pro Camera Lens Container */}
         <div className="relative rounded-[3rem] overflow-hidden bg-black aspect-square border-[8px] border-white/5 shadow-2xl ring-1 ring-white/10">
-          <div id="reader" className="w-full h-full object-cover grayscale-[15%]" />
+          <div id="reader" className="w-full h-full object-cover" />
           
           {scanning && !scannedData && !error && (
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
