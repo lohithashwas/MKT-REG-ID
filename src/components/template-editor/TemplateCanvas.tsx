@@ -74,7 +74,8 @@ const TemplateCanvas = ({
     };
 
     switch (el.type) {
-      case "photo":
+      case "photo": {
+        const isCircle = el.photoShape === "circle";
         return (
           <img
             src={SAMPLE_DATA.photo}
@@ -83,12 +84,13 @@ const TemplateCanvas = ({
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              borderRadius: el.borderRadius ? `${el.borderRadius}px` : undefined,
+              borderRadius: isCircle ? "50%" : el.borderRadius ? `${el.borderRadius}px` : undefined,
               border: "2px solid #2d3748",
             }}
             draggable={false}
           />
         );
+      }
       case "name":
         return <div style={textStyle}>{SAMPLE_DATA.name}</div>;
       case "teamName":

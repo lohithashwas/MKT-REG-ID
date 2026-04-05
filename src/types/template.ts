@@ -30,6 +30,7 @@ export interface TemplateElement {
   visible: boolean;
   imageSrc?: string; // base64 for customImage elements
   objectFit?: "cover" | "contain" | "fill";
+  photoShape?: "square" | "circle";
 }
 
 export interface TemplateConfig {

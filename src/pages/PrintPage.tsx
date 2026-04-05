@@ -214,31 +214,34 @@ const PrintPage = () => {
           </div>
 
           <div className="py-8 flex flex-col items-center gap-8 print-area" ref={printRef}>
-            {pages.map((pageCards, pageIdx) => (
-              <div
-                key={pageIdx}
-                className="a4-page bg-white shadow-lg"
-                style={{
-                  width: `${A4_W}mm`,
-                  height: `${A4_H}mm`,
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${CARDS_PER_ROW}, ${A4_W / CARDS_PER_ROW}mm)`,
-                  gridTemplateRows: `repeat(${CARDS_PER_COL}, ${A4_H / CARDS_PER_COL}mm)`,
-                  gap: 0,
-                  padding: 0,
-                  margin: 0,
-                  overflow: "hidden",
-                }}
-              >
-                {pageCards.map((r) => {
-                  const cw = templateConfig?.cardWidth || CARD_WIDTH;
-                  const ch = templateConfig?.cardHeight || CARD_HEIGHT;
-                  const cellWPx = 70 * 3.7795;
-                  const cellHPx = 74.25 * 3.7795;
-                  const s = Math.min(cellWPx / cw, cellHPx / ch);
-                  return (
-                    <div key={r.id} style={{ width: "70mm", height: "74.25mm", overflow: "hidden" }}>
-                      <div style={{ transform: `scale(${s})`, transformOrigin: "top left" }}>
+            {pages.map((pageCards, pageIdx) => {
+              const cellW = A4_W / CARDS_PER_ROW;
+              const cellH = A4_H / CARDS_PER_COL;
+              const cw = templateConfig?.cardWidth || CARD_WIDTH;
+              const ch = templateConfig?.cardHeight || CARD_HEIGHT;
+              const cellWPx = cellW * 3.7795;
+              const cellHPx = cellH * 3.7795;
+              const s = Math.min(cellWPx / cw, cellHPx / ch);
+              return (
+                <div
+                  key={pageIdx}
+                  className="a4-page bg-white"
+                  style={{
+                    width: `${A4_W}mm`,
+                    height: `${A4_H}mm`,
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${CARDS_PER_ROW}, ${cellW}mm)`,
+                    gridTemplateRows: `repeat(${CARDS_PER_COL}, ${cellH}mm)`,
+                    gap: 0,
+                    padding: 0,
+                    margin: 0,
+                    overflow: "hidden",
+                    border: "none",
+                  }}
+                >
+                  {pageCards.map((r) => (
+                    <div key={r.id} style={{ width: `${cellW}mm`, height: `${cellH}mm`, overflow: "hidden", padding: 0, margin: 0, border: "none" }}>
+                      <div style={{ transform: `scale(${s})`, transformOrigin: "top left", width: `${cw}px`, height: `${ch}px` }}>
                         <TemplatePreviewCard
                           elements={templateConfig?.elements || DEFAULT_ELEMENTS}
                           backgroundColor={templateConfig?.backgroundColor || "#e8ecf1"}
@@ -249,10 +252,10 @@ const PrintPage = () => {
                         />
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  ))}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
