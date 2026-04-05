@@ -66,6 +66,13 @@ const ScannerPage = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const navigate = useNavigate();
 
+  const clearScan = useCallback(() => {
+    setScannedData(null);
+    setLastScannedId(null);
+    setStatus("ACTIVE");
+    setError(null);
+  }, []);
+
   // Load history from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('mkt-scanner-history');
@@ -376,7 +383,7 @@ const ScannerPage = () => {
                     </div>
                   </div>
 
-                  <Button onClick={() => setScannedData(null)} className="w-full h-20 bg-primary text-black font-black uppercase tracking-[0.35em] mt-2 shadow-[0_0_40px_rgba(0,229,160,0.5)] rounded-[2rem] group text-xl italic hover:scale-[1.02] active:scale-95 transition-all">
+                  <Button onClick={clearScan} className="w-full h-20 bg-primary text-black font-black uppercase tracking-[0.35em] mt-2 shadow-[0_0_40px_rgba(0,229,160,0.5)] rounded-[2rem] group text-xl italic hover:scale-[1.02] active:scale-95 transition-all">
                     NEXT SCAN <ChevronRight className="w-7 h-7 ml-2 group-hover:translate-x-2 transition-transform" />
                   </Button>
                 </div>
