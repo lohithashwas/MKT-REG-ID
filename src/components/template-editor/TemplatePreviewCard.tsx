@@ -190,9 +190,10 @@ const TemplatePreviewCard = ({
           >
             <QRCodeSVG 
               value={data.id} 
-              size={Math.min(el.width, el.height) - 8}
+              size={Math.min(el.width, el.height) - 16}
               level="L"
-              includeMargin={false}
+              includeMargin={true}
+              marginSize={2}
               style={{ width: "100%", height: "100%", display: "block" }}
             />
           </div>
