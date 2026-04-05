@@ -145,6 +145,8 @@ const ScannerPage = () => {
   const onScanSuccessRef = useRef<((id: string) => void) | null>(null);
   onScanSuccessRef.current = fetchRegistration;
 
+  const nativeLoopRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (scanning && !scannerRef.current) {
         const initScanner = async () => {
@@ -157,38 +159,51 @@ const ScannerPage = () => {
                     throw new Error("No camera hardware found");
                 }
                 
-                // Native Intelligence Discovery: Find high-def back camera
+                // Smart Discovery: Prioritize back/rear cameras
                 let backCameraId = cameras[cameras.length - 1].id;
                 const rearCamera = cameras.find(c => 
                     c.label.toLowerCase().includes('back') || 
                     c.label.toLowerCase().includes('rear') ||
                     c.label.toLowerCase().includes('environment')
-                );
-                if (rearCamera) backCameraId = rearCamera.id;
+                ) || cameras[0];
+                backCameraId = rearCamera.id;
                 
                 // Advanced Native Intelligence Constraints: Full HD & Continuous Focus
                 await scanner.start(
                     backCameraId,
                     {
-                        fps: 30, // Hardware-accelerated fluidity
-                        qrbox: { width: 280, height: 280 }, // Large scan region for small QRs
+                        fps: 30, 
+                        qrbox: { width: 300, height: 300 }, // Full-frame scan for small QRs
                         aspectRatio: 1.0,
                         videoConstraints: {
-                           width: { min: 1280, ideal: 1920, max: 2560 },
-                           height: { min: 720, ideal: 1080, max: 1440 },
+                           width: { ideal: 1920 },
+                           height: { ideal: 1080 },
                            facingMode: "environment",
                            focusMode: "continuous",
-                           // @ts-ignore - non-standard browser features for zooming small QRs
+                           // @ts-ignore
                            whiteBalanceMode: "continuous"
                         }
                     },
-                    (decodedText) => {
-                        if (onScanSuccessRef.current) {
-                            onScanSuccessRef.current(decodedText);
-                        }
-                    },
+                    () => {}, // fallback ignored for native loop
                     undefined
                 );
+                
+                // START NATIVE HARDWARE LOOP (Built-in Camera Tech)
+                const video = document.querySelector('#reader video') as HTMLVideoElement;
+                if (video && 'BarcodeDetector' in window) {
+                   const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+                   const scanFrame = async () => {
+                      if (!scannerRef.current?.isScanning) return;
+                      try {
+                         const results = await detector.detect(video);
+                         if (results.length > 0 && onScanSuccessRef.current) {
+                            onScanSuccessRef.current(results[0].rawValue);
+                         }
+                      } catch (e) {}
+                      nativeLoopRef.current = requestAnimationFrame(scanFrame);
+                   };
+                   scanFrame();
+                }
                 
                 setCameraReady(true);
                 setStatus("ACTIVE");
@@ -205,6 +220,7 @@ const ScannerPage = () => {
     }
     
     return () => {
+        if (nativeLoopRef.current) cancelAnimationFrame(nativeLoopRef.current);
         if (scannerRef.current) {
             if (scannerRef.current.isScanning) {
                 scannerRef.current.stop().catch(() => {});
