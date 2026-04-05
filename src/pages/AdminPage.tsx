@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Download, Search, Users, Shield, ArrowLeft, Printer, Palette } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import * as XLSX from "xlsx";
 
 interface Registration {
@@ -19,10 +20,8 @@ interface Registration {
   registeredAt: string;
 }
 
-const ADMIN_PIN = "admin2024";
-
 const AdminPage = () => {
-  const [authenticated, setAuthenticated] = useState(false);
+  const { authenticated, login } = useAdminAuth();
   const [pin, setPin] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [search, setSearch] = useState("");
@@ -50,9 +49,7 @@ const AdminPage = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      setAuthenticated(true);
-    } else {
+    if (!login(pin)) {
       toast.error("Invalid PIN");
     }
   };

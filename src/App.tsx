@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import Index from "./pages/Index.tsx";
 import AdminPage from "./pages/AdminPage.tsx";
 import PrintPage from "./pages/PrintPage.tsx";
@@ -16,19 +17,20 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/print" element={<PrintPage />} />
-          <Route path="/template-editor" element={<TemplateEditorPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AdminAuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/print" element={<PrintPage />} />
+            <Route path="/template-editor" element={<TemplateEditorPage />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AdminAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
 
 export default App;
-

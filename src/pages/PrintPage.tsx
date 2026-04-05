@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowLeft, Printer, Download, Edit2, Check, X, Shield, Palette } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import TemplatePreviewCard from "@/components/template-editor/TemplatePreviewCard";
 import { TemplateConfig, DEFAULT_ELEMENTS, CARD_WIDTH, CARD_HEIGHT } from "@/types/template";
 import html2canvas from "html2canvas-pro";
@@ -22,17 +23,15 @@ interface Registration {
   registeredAt: string;
 }
 
-const ADMIN_PIN = "admin2024";
 const CARDS_PER_ROW = 3;
 const CARDS_PER_COL = 4;
 const CARDS_PER_PAGE = CARDS_PER_ROW * CARDS_PER_COL;
 
-// A4 in mm
 const A4_W = 210;
 const A4_H = 297;
 
 const PrintPage = () => {
-  const [authenticated, setAuthenticated] = useState(false);
+  const { authenticated, login } = useAdminAuth();
   const [pin, setPin] = useState("");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +44,9 @@ const PrintPage = () => {
 
   useEffect(() => {
     if (!authenticated) return;
-    // Load template
     get(ref(database, "templateConfig")).then((snap) => {
       if (snap.exists()) setTemplateConfig(snap.val() as TemplateConfig);
     });
-    // Load registrations
     const regRef = ref(database, "registrations");
     const unsub = onValue(regRef, (snapshot) => {
       const data = snapshot.val();
@@ -69,9 +66,7 @@ const PrintPage = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      setAuthenticated(true);
-    } else {
+    if (!login(pin)) {
       toast.error("Invalid PIN");
     }
   };
@@ -96,12 +91,9 @@ const PrintPage = () => {
   const generatePDF = async () => {
     if (!printRef.current) return;
     setGenerating(true);
-
     try {
-      // Get all A4 page elements
       const pages = printRef.current.querySelectorAll(".a4-page");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i] as HTMLElement;
         const canvas = await html2canvas(page, {
@@ -110,12 +102,10 @@ const PrintPage = () => {
           allowTaint: true,
           backgroundColor: "#ffffff",
         });
-
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         if (i > 0) pdf.addPage();
         pdf.addImage(imgData, "JPEG", 0, 0, A4_W, A4_H);
       }
-
       pdf.save("id-cards.pdf");
       toast.success("PDF downloaded!");
     } catch (err) {
@@ -126,7 +116,6 @@ const PrintPage = () => {
     }
   };
 
-  // Chunk registrations into pages
   const pages: Registration[][] = [];
   for (let i = 0; i < registrations.length; i += CARDS_PER_PAGE) {
     pages.push(registrations.slice(i, i + CARDS_PER_PAGE));
@@ -158,7 +147,6 @@ const PrintPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Toolbar */}
       <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
@@ -187,7 +175,6 @@ const PrintPage = () => {
         <p className="text-center text-muted-foreground py-12">No registrations found.</p>
       ) : (
         <>
-          {/* Edit panel */}
           <div className="p-4 max-w-6xl mx-auto no-print">
             <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
               Edit Registrations (click edit to modify before printing)
@@ -198,39 +185,16 @@ const PrintPage = () => {
                   <CardContent className="p-3">
                     {editingId === r.id ? (
                       <div className="space-y-2">
-                        <Input
-                          value={editData.name || ""}
-                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                          placeholder="Name"
-                          className="h-8 text-sm"
-                        />
-                        <Input
-                          value={editData.teamName || ""}
-                          onChange={(e) => setEditData({ ...editData, teamName: e.target.value })}
-                          placeholder="Team Name"
-                          className="h-8 text-sm"
-                        />
-                        <Input
-                          value={editData.collegeName || ""}
-                          onChange={(e) => setEditData({ ...editData, collegeName: e.target.value })}
-                          placeholder="College"
-                          className="h-8 text-sm"
-                        />
-                        <select
-                          value={editData.track || ""}
-                          onChange={(e) => setEditData({ ...editData, track: e.target.value })}
-                          className="w-full h-8 text-sm border border-input rounded-md px-2 bg-background"
-                        >
+                        <Input value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} placeholder="Name" className="h-8 text-sm" />
+                        <Input value={editData.teamName || ""} onChange={(e) => setEditData({ ...editData, teamName: e.target.value })} placeholder="Team Name" className="h-8 text-sm" />
+                        <Input value={editData.collegeName || ""} onChange={(e) => setEditData({ ...editData, collegeName: e.target.value })} placeholder="College" className="h-8 text-sm" />
+                        <select value={editData.track || ""} onChange={(e) => setEditData({ ...editData, track: e.target.value })} className="w-full h-8 text-sm border border-input rounded-md px-2 bg-background">
                           <option value="SW Track">SW Track</option>
                           <option value="HW Track">HW Track</option>
                         </select>
                         <div className="flex gap-2">
-                          <Button size="sm" className="h-7 text-xs" onClick={saveEdit}>
-                            <Check className="w-3 h-3 mr-1" /> Save
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingId(null)}>
-                            <X className="w-3 h-3 mr-1" /> Cancel
-                          </Button>
+                          <Button size="sm" className="h-7 text-xs" onClick={saveEdit}><Check className="w-3 h-3 mr-1" /> Save</Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingId(null)}><X className="w-3 h-3 mr-1" /> Cancel</Button>
                         </div>
                       </div>
                     ) : (
@@ -238,15 +202,9 @@ const PrintPage = () => {
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{r.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{r.teamName} · {r.collegeName}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            r.track.includes("SW") ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"
-                          }`}>
-                            {r.track}
-                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${r.track.includes("SW") ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>{r.track}</span>
                         </div>
-                        <Button size="sm" variant="ghost" className="h-7" onClick={() => startEdit(r)}>
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={() => startEdit(r)}><Edit2 className="w-3 h-3" /></Button>
                       </div>
                     )}
                   </CardContent>
@@ -255,7 +213,6 @@ const PrintPage = () => {
             </div>
           </div>
 
-          {/* Print preview */}
           <div className="py-8 flex flex-col items-center gap-8 print-area" ref={printRef}>
             {pages.map((pageCards, pageIdx) => (
               <div
@@ -276,7 +233,7 @@ const PrintPage = () => {
                 {pageCards.map((r) => {
                   const cw = templateConfig?.cardWidth || CARD_WIDTH;
                   const ch = templateConfig?.cardHeight || CARD_HEIGHT;
-                  const cellWPx = 70 * 3.7795; // 70mm in px
+                  const cellWPx = 70 * 3.7795;
                   const cellHPx = 74.25 * 3.7795;
                   const s = Math.min(cellWPx / cw, cellHPx / ch);
                   return (
@@ -288,14 +245,7 @@ const PrintPage = () => {
                           backgroundImage={templateConfig?.background}
                           cardWidth={cw}
                           cardHeight={ch}
-                          data={{
-                            id: r.id,
-                            name: r.name,
-                            teamName: r.teamName,
-                            collegeName: r.collegeName,
-                            track: r.track,
-                            photo: r.photo,
-                          }}
+                          data={{ id: r.id, name: r.name, teamName: r.teamName, collegeName: r.collegeName, track: r.track, photo: r.photo }}
                         />
                       </div>
                     </div>
@@ -311,11 +261,7 @@ const PrintPage = () => {
         @media print {
           .no-print, .sticky { display: none !important; }
           .print-area { padding: 0 !important; }
-          .a4-page {
-            box-shadow: none !important;
-            page-break-after: always;
-            margin: 0 !important;
-          }
+          .a4-page { box-shadow: none !important; page-break-after: always; margin: 0 !important; }
           body { margin: 0; padding: 0; }
           @page { size: A4; margin: 0; }
         }
