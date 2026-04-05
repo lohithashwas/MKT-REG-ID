@@ -56,14 +56,8 @@ const ScannerPage = () => {
     setCameraReady(false);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      stopScanner();
-    };
-  }, [stopScanner]);
-
   const fetchRegistration = useCallback(async (id: string) => {
-    if (id === lastScannedId) return; // avoid rescanning same ID immediately
+    if (id === lastScannedId) return;
     setLastScannedId(id);
     setLoading(true);
     setError(null);
@@ -73,7 +67,6 @@ const ScannerPage = () => {
         const data = snap.val() as Omit<Registration, "id">;
         setScannedData({ id, ...data });
         toast.success(`Found: ${data.name}`);
-        // Add haptic feedback for "instant" scan confirmation
         if (navigator.vibrate) navigator.vibrate(100);
       } else {
         setError("Registration not found for this barcode.");
@@ -89,55 +82,68 @@ const ScannerPage = () => {
     }
   }, [lastScannedId]);
 
-  const startScanner = useCallback(async () => {
-    if (!videoRef.current) return;
+  useEffect(() => {
+    return () => {
+      if (readerRef.current) {
+        readerRef.current.reset();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (scanning && videoRef.current && !readerRef.current) {
+      const initScanner = async () => {
+        try {
+          const hints = new Map();
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.CODE_128,
+          ]);
+          hints.set(DecodeHintType.TRY_HARDER, true);
+          const reader = new BrowserMultiFormatReader(hints);
+          readerRef.current = reader;
+
+          const devices = await reader.listVideoInputDevices();
+          const backCamera = devices.find((d) =>
+            d.label.toLowerCase().includes("back") ||
+            d.label.toLowerCase().includes("rear") ||
+            d.label.toLowerCase().includes("environment")
+          );
+          const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
+
+          if (devices.length === 0) {
+            setError("No camera found on this device.");
+            setScanning(false);
+            return;
+          }
+
+          reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
+            if (result) {
+              fetchRegistration(result.getText());
+            }
+            if (err && !(err instanceof NotFoundException)) {
+              console.warn(err);
+            }
+          });
+
+          setCameraReady(true);
+        } catch (e) {
+          console.error("Scanner Error:", e);
+          setError("Could not access camera. Please allow camera permission.");
+          setScanning(false);
+        }
+      };
+      initScanner();
+    }
+  }, [scanning, fetchRegistration, stopScanner]);
+
+  const startScanner = () => {
     setScanning(true);
     setCameraReady(false);
     setError(null);
     setScannedData(null);
     setLastScannedId(null);
-
-    try {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.CODE_128,
-      ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      const reader = new BrowserMultiFormatReader(hints);
-      readerRef.current = reader;
-
-      const devices = await reader.listVideoInputDevices();
-      const backCamera = devices.find((d) =>
-        d.label.toLowerCase().includes("back") ||
-        d.label.toLowerCase().includes("rear") ||
-        d.label.toLowerCase().includes("environment")
-      );
-      const deviceId = backCamera?.deviceId || devices[0]?.deviceId;
-
-      if (devices.length === 0) {
-        setError("No camera found on this device.");
-        setScanning(false);
-        return;
-      }
-
-      reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
-        if (result) {
-          const text = result.getText();
-          fetchRegistration(text);
-        }
-        if (err && !(err instanceof NotFoundException)) {
-          console.warn(err);
-        }
-      });
-
-      setCameraReady(true);
-    } catch (e) {
-      console.error(e);
-      setError("Could not access camera. Please allow camera permission.");
-      setScanning(false);
-    }
-  }, [fetchRegistration]);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,8 +194,7 @@ const ScannerPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top bar */}
+    <div className="min-h-screen bg-background text-foreground">
       <div className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => { stopScanner(); navigate("/admin"); }}>
@@ -213,36 +218,10 @@ const ScannerPage = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 grid md:grid-cols-2 gap-6">
-        {/* Camera view */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Camera Feed</h3>
-          <div
-            className="relative rounded-2xl overflow-hidden bg-black border border-border"
-            style={{ aspectRatio: "4/3" }}
-          >
-            {/* Scan overlay */}
-            {scanning && cameraReady && (
-              <>
-                <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-                  <div
-                    className="border-2 border-primary rounded-xl"
-                    style={{ width: "60%", height: "40%", boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
-                  />
-                </div>
-                {/* Animated scan line */}
-                <div className="absolute z-20 pointer-events-none" style={{ top: "30%", left: "20%", width: "60%" }}>
-                  <div
-                    className="h-0.5 bg-primary/80 shadow-lg"
-                    style={{
-                      animation: "scanline 2s ease-in-out infinite",
-                      boxShadow: "0 0 8px 2px hsl(var(--primary))",
-                    }}
-                  />
-                </div>
-              </>
-            )}
-
+      <div className="max-w-4xl mx-auto p-4 grid md:grid-cols-2 gap-6 pb-20">
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Live Camera Feed</h3>
+          <div className="relative rounded-3xl overflow-hidden bg-black aspect-[4/3] border border-border shadow-2xl group">
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
@@ -251,147 +230,134 @@ const ScannerPage = () => {
               style={{ display: scanning ? "block" : "none" }}
             />
             
-            {/* Scanning Box Guide for instant alignment */}
             {scanning && !scannedData && (
               <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-                <div className="w-56 h-56 border-2 border-primary/60 rounded-xl relative">
-                  {/* Focus corners */}
-                  <div className="absolute -top-1 -left-1 w-6 h-6 border-l-4 border-t-4 border-primary rounded-tl-lg" />
-                  <div className="absolute -top-1 -right-1 w-6 h-6 border-r-4 border-t-4 border-primary rounded-tr-lg" />
-                  <div className="absolute -bottom-1 -left-1 w-6 h-6 border-l-4 border-b-4 border-primary rounded-bl-lg" />
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 border-r-4 border-b-4 border-primary rounded-br-lg" />
-                  
-                  {/* Scanning Animation Line */}
-                  <div className="absolute inset-x-2 top-0 h-0.5 bg-primary/40 shadow-[0_0_10px_rgba(var(--primary),0.5)] animate-scan-line" />
+                <div className="w-64 h-64 border-2 border-primary/40 rounded-3xl relative overflow-hidden backdrop-blur-[1px]">
+                  <div className="absolute -top-1 -left-1 w-8 h-8 border-l-4 border-t-4 border-primary rounded-tl-xl" />
+                  <div className="absolute -top-1 -right-1 w-8 h-8 border-r-4 border-t-4 border-primary rounded-tr-xl" />
+                  <div className="absolute -bottom-1 -left-1 w-8 h-8 border-l-4 border-b-4 border-primary rounded-bl-xl" />
+                  <div className="absolute -bottom-1 -right-1 w-8 h-8 border-r-4 border-b-4 border-primary rounded-br-xl" />
+                  <div className="absolute inset-x-4 top-0 h-[2px] bg-primary animate-scan-line shadow-[0_0_15px_hsl(var(--primary))]" />
                 </div>
               </div>
             )}
 
             {!scanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                <Camera className="w-12 h-12 opacity-30" />
-                <p className="text-sm">Click "Start Camera" to begin scanning</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-4 bg-muted/20">
+                <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center shadow-lg">
+                  <Camera className="w-8 h-8 opacity-40 text-primary" />
+                </div>
+                <p className="text-sm font-medium">Ready to start scanning</p>
               </div>
             )}
 
             {scanning && !cameraReady && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="text-sm">Initializing camera...</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md text-white gap-4">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <p className="text-sm font-medium tracking-tight">Accessing camera hardware...</p>
               </div>
             )}
           </div>
 
           {scanning && cameraReady && (
-            <p className="text-center text-xs text-muted-foreground">
-              Point the camera at a barcode on an ID card
-            </p>
+            <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 text-center">
+              <p className="text-[13px] text-muted-foreground">
+                Position the <span className="text-primary font-bold">QR Code</span> or <span className="text-primary font-bold">Barcode</span> inside the frame for instant detection.
+              </p>
+            </div>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
-              <X className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
+            <div className="flex items-center gap-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-2xl p-4 text-sm animate-in fade-in zoom-in duration-300">
+              <X className="w-5 h-5 shrink-0" />
+              <p className="font-medium">{error}</p>
             </div>
           )}
         </div>
 
-        {/* Scanned result */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Participant Details</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Scanning Result</h3>
             {scannedData && (
-              <Button variant="ghost" size="sm" onClick={clearScan} className="h-7 text-xs">
-                <RefreshCw className="w-3 h-3 mr-1" /> Clear
+              <Button variant="ghost" size="sm" onClick={clearScan} className="h-8 text-xs font-bold hover:bg-primary/10 hover:text-primary">
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> RE-SCAN
               </Button>
             )}
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm">Looking up registration...</p>
+            <div className="flex flex-col items-center justify-center gap-4 py-24 bg-muted/20 border-2 border-dashed border-border rounded-[2rem]">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-sm font-semibold text-muted-foreground">Syncing with database...</p>
             </div>
           ) : scannedData ? (
-            <Card className="glass-card overflow-hidden border-primary/30">
+            <Card className="glass-card overflow-hidden border-primary/20 shadow-2xl animate-in slide-in-from-right duration-500">
               <CardContent className="p-0">
-                {/* Header band */}
-                <div className={`px-4 py-2 text-xs font-semibold tracking-wider uppercase ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-500/15 text-blue-400" : "bg-rose-500/15 text-rose-400"}`}>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {scannedData.track}
-                  </div>
+                <div className={`px-6 py-3 text-[11px] font-black tracking-[0.2em] uppercase flex items-center gap-2 ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-500 text-white" : "bg-rose-500 text-white"}`}>
+                  <CheckCircle2 className="w-4 h-4 ml-[-2px]" />
+                  Verified Participant
                 </div>
 
-                <div className="p-4 flex gap-4">
-                  {/* Photo */}
-                  {scannedData.photo && (
-                    <div className="w-24 h-28 rounded-xl overflow-hidden border-2 border-border flex-shrink-0">
+                <div className="p-6">
+                  <div className="flex gap-6 items-start">
+                    <div className="w-32 h-40 rounded-2xl overflow-hidden shadow-xl border-2 border-border shadow-black/5 flex-shrink-0">
                       <img
                         src={scannedData.photo}
                         alt={scannedData.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover grayscale-[20%] contrast-[110%]"
+                        crossOrigin="anonymous"
                       />
                     </div>
-                  )}
 
-                  {/* Details */}
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-0.5">
-                        <User className="w-3 h-3" /> Name
+                    <div className="flex-1 space-y-4 pt-1">
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Full Name</p>
+                        <h4 className="font-display font-black text-2xl leading-none text-foreground tracking-tight uppercase">{scannedData.name}</h4>
                       </div>
-                      <p className="font-display font-bold text-lg leading-tight text-foreground">{scannedData.name}</p>
-                    </div>
 
-                    <div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-0.5">
-                        <Users className="w-3 h-3" /> Team
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Team</p>
+                          <p className="font-bold text-sm text-foreground truncate">{scannedData.teamName}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Track</p>
+                          <p className="font-bold text-sm text-foreground">{scannedData.track}</p>
+                        </div>
                       </div>
-                      <p className="font-semibold text-sm text-foreground">{scannedData.teamName}</p>
-                    </div>
 
-                    <div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-0.5">
-                        <School className="w-3 h-3" /> College
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">College / Organization</p>
+                        <p className="text-sm font-medium text-muted-foreground italic leading-tight uppercase">{scannedData.collegeName}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground leading-tight">{scannedData.collegeName}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-border px-4 py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <Tag className="w-3 h-3" />
-                    <span className="font-mono">{scannedData.id.slice(0, 16)}…</span>
+                <div className="bg-muted/50 px-6 py-4 flex items-center justify-between border-t border-border/50">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Tag className="w-4 h-4" />
+                    <span className="font-mono text-xs font-black tracking-tighter">{scannedData.id}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(scannedData.registeredAt).toLocaleDateString("en-IN", {
-                      day: "2-digit", month: "short", year: "numeric",
-                    })}
-                  </span>
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                    {new Date(scannedData.registeredAt).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-4 py-16 text-muted-foreground border-2 border-dashed border-border rounded-2xl">
-              <ScanLine className="w-12 h-12 opacity-30" />
-              <div className="text-center">
-                <p className="text-sm font-medium">No scan yet</p>
-                <p className="text-xs mt-1">Scan an ID card barcode to see participant details</p>
+            <div className="flex flex-col items-center justify-center gap-6 py-24 bg-muted/20 border-2 border-dashed border-border rounded-[2rem] text-center px-8 group">
+              <div className="w-20 h-20 rounded-3xl bg-background flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                <ScanLine className="w-10 h-10 opacity-20 text-primary" />
+              </div>
+              <div>
+                <p className="text-base font-black tracking-tight text-foreground">AWAITING SCAN...</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] mx-auto leading-relaxed">Please align any participant ID inside the camera guide.</p>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes scanline {
-          0% { transform: translateY(0); opacity: 1; }
-          50% { transform: translateY(calc(40vh * 0.4)); opacity: 0.6; }
-          100% { transform: translateY(0); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 };
