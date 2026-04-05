@@ -101,10 +101,10 @@ const ScannerPage = () => {
     try {
       await update(ref(database, `registrations/${scannedData.id}/actions`), { [actionKey]: true });
       setScannedData(prev => prev ? { ...prev, actions: { ...(prev.actions || {}), [actionKey]: true } } : null);
-      toast.success("Success");
+      toast.success("Locked Successfully");
       if (navigator.vibrate) navigator.vibrate(50);
     } catch {
-      toast.error("Error");
+      toast.error("Error Updating Database");
     }
   };
 
@@ -173,30 +173,19 @@ const ScannerPage = () => {
     if (scanning) {
       const initCamera = async () => {
         try {
-          // CONSOLIDATED CONSTRAINTS for maximum reliability
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-              facingMode: { ideal: "environment" },
-              // Use ideal values that are standard for mobile cameras
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
           });
 
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            
-            // Wait for the video to play before marking ready
-            // Skip the metadata listener as it's unreliable on mobile
             try {
               await videoRef.current.play();
               setCameraReady(true);
               setStatus("ACTIVE");
               requestRef.current = requestAnimationFrame(scanFrame);
             } catch (pErr) {
-              console.error("Auto-play blocked:", pErr);
-              // Set ready anyway so user can see it
               setCameraReady(true);
               setStatus("ACTIVE");
               requestRef.current = requestAnimationFrame(scanFrame);
@@ -206,7 +195,7 @@ const ScannerPage = () => {
           setError(err.name === 'NotAllowedError' ? "Permission Denied" : "Hardware failure");
           setScanning(false);
           setStatus("ERROR");
-          toast.error("Lens failed. Check permissions.");
+          toast.error("Check Camera Permissions");
         }
       };
       initCamera();
@@ -237,7 +226,7 @@ const ScannerPage = () => {
             <h2 className="text-xl font-bold text-center text-white mb-6 uppercase tracking-tighter">Event Terminal</h2>
             <form onSubmit={handleLogin} className="space-y-4">
               <Input type="password" placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} autoFocus className="text-center text-2xl h-14 bg-white/5 border-white/10" />
-              <Button type="submit" className="w-full h-14 font-black uppercase text-lg">Launch Camera</Button>
+              <Button type="submit" className="w-full h-14 font-black uppercase text-lg">Launch Scanner</Button>
             </form>
           </CardContent>
         </Card>
@@ -259,9 +248,9 @@ const ScannerPage = () => {
         </div>
         <div className="flex gap-2">
           {scanning ? (
-            <Button variant="destructive" size="sm" onClick={stopScanner}>STOP</Button>
+            <Button variant="destructive" size="sm" onClick={stopScanner} className="h-8">STOP</Button>
           ) : (
-            <Button size="sm" onClick={startScanner} className="bg-primary text-black font-bold">START</Button>
+            <Button size="sm" onClick={startScanner} className="h-8 bg-primary text-black font-bold">START</Button>
           )}
         </div>
       </div>
@@ -285,19 +274,12 @@ const ScannerPage = () => {
               <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Opening Iris...</p>
             </div>
           )}
-
-          {!scanning && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 opacity-20">
-              <ScanLine className="w-16 h-16" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Ready to scan</p>
-            </div>
-          )}
         </div>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center gap-3 text-red-500 animate-in slide-in-from-top">
-            <X className="w-5 h-5 shrink-0" /> <p className="text-xs font-bold uppercase flex-1">{error}</p>
-            <Button size="sm" variant="ghost" onClick={startScanner} className="text-xs font-black">Retry</Button>
+            <X className="w-5 h-5 shrink-0" /> <p className="text-xs font-bold uppercase flex-1 text-center">{error}</p>
+            <Button size="sm" variant="ghost" onClick={startScanner} className="font-black h-8">Retry</Button>
           </div>
         )}
 
@@ -305,58 +287,52 @@ const ScannerPage = () => {
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-6 py-20 bg-white/5 border border-white/10 rounded-[3rem]">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Connecting Database...</p>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Syncing Record...</p>
             </div>
           ) : scannedData ? (
             <Card className="bg-[#111318] border-2 border-primary/20 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
               <CardContent className="p-0">
                 <div className={`px-6 py-3 text-[10px] font-black tracking-[0.25em] uppercase flex items-center justify-between ${scannedData.track.toLowerCase().includes("sw") ? "bg-blue-600" : "bg-rose-600"} text-white`}>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Verified
-                  </div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5" /> Verified</div>
                   <span className="opacity-60 font-mono">#{scannedData.id.slice(-6)}</span>
                 </div>
 
-                <div className="p-6 pb-2">
+                <div className="p-6">
                   <div className="flex gap-5 items-start">
                     <div className="w-24 h-32 rounded-2xl overflow-hidden shadow-lg border border-white/10 flex-shrink-0">
                       <img src={scannedData.photo} alt={scannedData.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                     </div>
                     <div className="flex-1 min-w-0 pt-1">
                       <div className="mb-4">
-                        <p className="text-[9px] font-black text-white/30 uppercase mb-1">Participant</p>
+                        <p className="text-[9px] font-black text-white/50 uppercase mb-1 tracking-tighter">Participant</p>
                         <h4 className="font-display font-black text-xl text-white leading-tight uppercase break-words line-clamp-2">
                           {scannedData.name}
                         </h4>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="min-w-0">
-                          <p className="text-[9px] font-black text-white/30 uppercase mb-0.5">Team</p>
-                          <p className="font-bold text-xs text-white truncate">{scannedData.teamName}</p>
+                          <p className="text-[9px] font-black text-white/50 uppercase mb-0.5 tracking-tighter line-clamp-1">TEAM: {scannedData.teamName}</p>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[9px] font-black text-white/30 uppercase mb-0.5">Category</p>
-                          <p className="font-bold text-xs text-white truncate">{scannedData.track}</p>
+                          <p className="text-[9px] font-black text-white/50 uppercase mb-0.5 tracking-tighter line-clamp-1">ROLE: {scannedData.track}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-white/5">
+                  <div className="mt-6 pt-4 border-t border-white/5">
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="secondary" size="sm" className="w-full h-10 text-[10px] font-black uppercase bg-white/5 rounded-2xl">
-                          <Info className="w-4 h-4 mr-2" /> Extended Info
+                        <Button variant="secondary" size="sm" className="w-full h-10 text-[10px] font-black uppercase bg-white/10 hover:bg-white/20 border-white/5 rounded-2xl text-white">
+                          <Info className="w-4 h-4 mr-2" /> View Extended Metadata
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-sm rounded-[2rem] bg-[#0a0c0f] border-white/10 text-white">
-                        <DialogHeader>
-                          <DialogTitle className="text-xl font-bold uppercase">Record Metadata</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 pt-6 text-xs font-mono">
-                          <p>Reg ID: {scannedData.id}</p>
-                          <p>Org: {scannedData.collegeName}</p>
-                          <p>Time: {new Date(scannedData.registeredAt).toLocaleString()}</p>
+                      <DialogContent className="max-w-sm rounded-[2rem] bg-[#111318] border-white/10 text-white">
+                        <DialogHeader><DialogTitle className="uppercase font-bold tracking-tight">Record View</DialogTitle></DialogHeader>
+                        <div className="space-y-4 pt-6 text-[11px] font-mono opacity-80">
+                          <p className="border-b border-white/5 pb-2">ID: {scannedData.id}</p>
+                          <p className="border-b border-white/5 pb-2">ORG: {scannedData.collegeName}</p>
+                          <p>SYNC: {new Date(scannedData.registeredAt).toLocaleString()}</p>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -367,13 +343,13 @@ const ScannerPage = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-4 px-1">
                       <CalendarCheck2 className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-black text-white/30 uppercase">Attendance Submission</span>
+                      <span className="text-[10px] font-black text-white/40 uppercase">Attendance Tracking</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {['Attendance_1', 'Attendance_2', 'Attendance_3'].map((key) => {
                         const isLocked = scannedData.actions?.[key] || false;
                         return (
-                          <Button key={key} variant="outline" size="sm" disabled={isLocked} className={`h-10 px-5 rounded-xl border-white/10 font-bold transition-all text-[10px] ${isLocked ? 'bg-green-600 text-black border-green-600 opacity-100' : 'text-white/60 hover:bg-white/5'}`} onClick={() => toggleAction(key)}>
+                          <Button key={key} variant="outline" size="sm" disabled={isLocked} className={`h-10 px-5 rounded-xl border-white/10 font-bold transition-all text-[10px] ${isLocked ? 'bg-primary text-black border-primary opacity-100' : 'text-white/60 hover:bg-white/5'}`} onClick={() => toggleAction(key)}>
                             {isLocked && <Lock className="w-3 h-3 mr-1" />} {key.replace('_',' ')}
                           </Button>
                         );
@@ -384,7 +360,7 @@ const ScannerPage = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-4 px-1">
                       <Utensils className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-black text-white/30 uppercase">Meal Fulfillment</span>
+                      <span className="text-[10px] font-black text-white/40 uppercase">Catering Fulfillment</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {[
@@ -404,8 +380,8 @@ const ScannerPage = () => {
                     </div>
                   </div>
 
-                  <Button onClick={clearScan} className="w-full h-16 bg-primary text-black font-black uppercase tracking-[0.25em] mt-2 shadow-[0_0_25px_#00e5a044] rounded-2xl group text-lg italic">
-                    RE-ARM SCANNER <ChevronRight className="w-6 h-6 ml-1" />
+                  <Button onClick={clearScan} className="w-full h-16 bg-primary text-black font-black uppercase tracking-[0.25em] mt-2 shadow-[0_0_30px_rgba(0,229,160,0.3)] rounded-2xl group text-lg italic">
+                    NEXT SCAN <ChevronRight className="w-6 h-6 ml-1 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
               </CardContent>
@@ -414,8 +390,8 @@ const ScannerPage = () => {
             <div className="flex flex-col items-center justify-center gap-8 py-20 bg-white/5 border border-white/10 rounded-[4rem] text-center px-12 group overflow-hidden">
               <ScanLine className="w-16 h-16 text-primary opacity-30 animate-pulse" />
               <div>
-                <p className="text-sm font-black tracking-[0.3em] text-white uppercase italic">Zero Latency Engaged</p>
-                <p className="text-[11px] text-white/30 leading-relaxed max-w-[200px] mx-auto uppercase">Ready for 100ms Lock-on</p>
+                <p className="text-sm font-black tracking-[0.3em] text-white uppercase italic">Zero Latency Active</p>
+                <p className="text-[10px] text-white/30 leading-relaxed max-w-[200px] mx-auto uppercase">Scanning at 60Hz ⚡</p>
               </div>
             </div>
           )}
@@ -423,11 +399,11 @@ const ScannerPage = () => {
           {history.length > 0 && !scannedData && (
             <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6">
               <div className="flex items-center gap-2 mb-4 text-white/20 text-[10px] font-black uppercase">
-                <History className="w-4 h-4" /> RECENT SCAN LOG
+                <History className="w-4 h-4" /> Recent Activities
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {history.map((entry, i) => (
-                  <div key={i} className="flex justify-between text-[11px] font-bold opacity-30">
+                  <div key={i} className="flex justify-between text-[11px] font-bold opacity-30 hover:opacity-100 transition-opacity">
                     <span className="truncate max-w-[150px]">{entry.name}</span>
                     <span>{new Date(entry.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                   </div>
