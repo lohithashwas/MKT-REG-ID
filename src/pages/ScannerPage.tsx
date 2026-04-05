@@ -92,6 +92,8 @@ const ScannerPage = () => {
 
   useEffect(() => {
     if (scanning && videoRef.current && !readerRef.current) {
+      let nativeInterval: any = null;
+
       const initScanner = async () => {
         try {
           const hints = new Map();
@@ -117,6 +119,27 @@ const ScannerPage = () => {
             return;
           }
 
+          // Native scan bridge for "Instant" hardware-accelerated scanning where supported
+          if ("BarcodeDetector" in window) {
+            try {
+              // @ts-ignore
+              const detector = new BarcodeDetector({ formats: ["qr_code", "code_128"] });
+              const checkNative = async () => {
+                if (!videoRef.current || !scanning) return;
+                try {
+                  const barcodes = await detector.detect(videoRef.current);
+                  if (barcodes.length > 0) {
+                    fetchRegistration(barcodes[0].rawValue);
+                  }
+                } catch (e) {}
+                if (scanning) nativeInterval = requestAnimationFrame(checkNative);
+              };
+              checkNative();
+            } catch (e) {
+              console.warn("Native scanner init failed:", e);
+            }
+          }
+
           reader.decodeFromVideoDevice(deviceId || undefined, videoRef.current!, (result, err) => {
             if (result) {
               fetchRegistration(result.getText());
@@ -134,6 +157,10 @@ const ScannerPage = () => {
         }
       };
       initScanner();
+
+      return () => {
+        if (nativeInterval) cancelAnimationFrame(nativeInterval);
+      };
     }
   }, [scanning, fetchRegistration, stopScanner]);
 
