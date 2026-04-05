@@ -87,12 +87,15 @@ const ScannerPage = () => {
   };
 
   const stopScanner = useCallback(async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      try {
-        await scannerRef.current.stop();
-      } catch (e) {
-        console.warn("Scanner stop warning:", e);
-      }
+    if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+            try {
+                await scannerRef.current.stop();
+            } catch (e) {
+                console.warn("Stop warning:", e);
+            }
+        }
+        scannerRef.current = null;
     }
     setScanning(false);
     setCameraReady(false);
@@ -154,7 +157,7 @@ const ScannerPage = () => {
                     throw new Error("No camera hardware found");
                 }
                 
-                // Smart Discovery: Prioritize back/rear cameras
+                // Native Intelligence Discovery: Find high-def back camera
                 let backCameraId = cameras[cameras.length - 1].id;
                 const rearCamera = cameras.find(c => 
                     c.label.toLowerCase().includes('back') || 
@@ -163,15 +166,23 @@ const ScannerPage = () => {
                 );
                 if (rearCamera) backCameraId = rearCamera.id;
                 
+                // Advanced Native Intelligence Constraints: Full HD & Continuous Focus
                 await scanner.start(
                     backCameraId,
                     {
-                        fps: 20, // High-speed tracking
-                        qrbox: { width: 250, height: 250 },
+                        fps: 30, // Hardware-accelerated fluidity
+                        qrbox: { width: 280, height: 280 }, // Large scan region for small QRs
                         aspectRatio: 1.0,
+                        videoConstraints: {
+                           width: { min: 1280, ideal: 1920, max: 2560 },
+                           height: { min: 720, ideal: 1080, max: 1440 },
+                           facingMode: "environment",
+                           focusMode: "continuous",
+                           // @ts-ignore - non-standard browser features for zooming small QRs
+                           whiteBalanceMode: "continuous"
+                        }
                     },
                     (decodedText) => {
-                        // USE THE REF: This prevents the scanner from restarting
                         if (onScanSuccessRef.current) {
                             onScanSuccessRef.current(decodedText);
                         }
@@ -183,7 +194,7 @@ const ScannerPage = () => {
                 setStatus("ACTIVE");
             } catch (err: any) {
                 console.error("Scanner Error:", err);
-                setError(`HARDWARE BLOCK: ${err.message || 'Busy'}`);
+                setError(`NATIVE BLOCK: ${err.message || 'Access Denied'}`);
                 setScanning(false);
                 setStatus("ERROR");
                 toast.error("Lens failed. Check permissions.");
@@ -194,10 +205,14 @@ const ScannerPage = () => {
     }
     
     return () => {
-        // ONLY stop if the scanning toggle is turned OFF manually
-        // We don't stop between individual scans anymore
+        if (scannerRef.current) {
+            if (scannerRef.current.isScanning) {
+                scannerRef.current.stop().catch(() => {});
+            }
+            scannerRef.current = null;
+        }
     };
-  }, [scanning]); // ONLY DEPEND ON SCANNING TOGGLE
+  }, [scanning]);
 
   const startScanner = () => {
     setScanning(true);
@@ -265,16 +280,19 @@ const ScannerPage = () => {
           
           {scanning && !scannedData && !error && (
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-64 border-[1.5px] border-primary/20 rounded-[2.5rem] relative overflow-hidden backdrop-blur-none">
+              <div className="w-72 h-72 border-[1.5px] border-primary/20 rounded-[2.5rem] relative overflow-hidden backdrop-blur-none">
                 <div className="absolute inset-x-8 top-0 h-[3px] bg-primary animate-scan-line shadow-[0_0_25px_#00e5a0] opacity-80" />
               </div>
             </div>
           )}
 
           {scanning && !cameraReady && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c0f] gap-6 z-20">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c0f] gap-6 z-20 text-center p-8">
               <Loader2 className="w-14 h-14 animate-spin text-primary" />
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 text-center">Opening Iris...</p>
+              <div className="space-y-1">
+                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Native Intelligence Active</p>
+                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/10 italic">Initializing Full HD Lens...</p>
+              </div>
             </div>
           )}
           
@@ -408,7 +426,7 @@ const ScannerPage = () => {
               </div>
               <div className="space-y-4">
                 <p className="text-base font-black tracking-[0.4em] text-white uppercase italic drop-shadow-glow">Terminal Armed</p>
-                <p className="text-[12px] text-white/20 tracking-[0.25em] leading-relaxed max-w-[240px] mx-auto uppercase">Lens Discovery Active</p>
+                <p className="text-[12px] text-white/20 tracking-[0.25em] leading-relaxed max-w-[240px] mx-auto uppercase">Native Hardware Active</p>
               </div>
             </div>
           )}
